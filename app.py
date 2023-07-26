@@ -5,7 +5,8 @@ from BlurWindow.blurWindow import GlobalBlur
 import time
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.ticker import Formatter
+from matplotlib.ticker import Formatter, FixedLocator
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -67,14 +68,22 @@ class Window(QMainWindow):
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0)")
 
   def plot_stock(self):
+    # Function to convert datetime string to "July 26" format
+    def format_x_label(datetime_str):
+      # Parse the datetime string to a datetime object
+      dt_obj = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S%z")
+      # Format the datetime object to "July 26" format
+      formatted_date = dt_obj.strftime("%B %d")
+      return formatted_date
+
     stock = "AAPL"
     data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # print(data.to_markdown())
-    print(data)
+    # print(data)
 
     data = data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
     data['Datetime'] = pd.to_datetime(data['Datetime'])
-    print(data['Datetime'])
+    # print(data['Datetime'])
 
     formatter = CustomFormatter(data['Datetime'])
     # Clear the existing plot
@@ -86,7 +95,7 @@ class Window(QMainWindow):
     data['Close'].plot(ax=ax, color='green')
 
     # Customize the plot
-    ax.set_xlabel('Date', color='white', fontsize=10)
+    ax.set_xlabel('Date', color='white', fontsize=10, rotation=45)
     ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
     ax.set_title(f'{stock} Stock Price Chart', color='white', fontsize=10)
     ax.set_facecolor('none')
@@ -95,8 +104,12 @@ class Window(QMainWindow):
 
     self.figure.set_size_inches(10, 6)
 
+    x_labels = range(len(data['Datetime']))
+    label_every_x_datapoints = 20
+    plt.xticks(x_labels[::label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::label_every_x_datapoints]], rotation=45, ha='right', color='white') # Rotate the x-axis labels for better readability
+    plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
-    # plt.yticks(color='white')  # Set y tick labels text color to white
+    plt.yticks(color='white')  # Set y tick labels text color to white
 
     # Set the color of spines (borders) to white
     for spine in ax.spines.values():
