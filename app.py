@@ -11,6 +11,20 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+### -------------------------------- Config -------------------------------- ###
+monday_lines = True
+stock = "AAPL" # temp
+
+## TODO
+# auto refresh charts
+# button to add additional charts
+# stock symbol input field
+# make size and position adjustable and fixable
+# make app a tool that lives in tray and starts up automatically
+# make corners rounded
+# make transparency better (without time.sleep)
+# create options menu
+
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
   def __init__(self, dates, format='%Y-%m-%d %H:%M:%S-%H:%M'):
@@ -57,8 +71,8 @@ class Window(QMainWindow):
   #   path.addRoundedRect(rectf, 100, 100)
 
   #   # Create a QRegion with the QPainterPath and set it as the widget's mask
-  #   region = QRegion(path.toFillPolygon().toPolygon())
-  #   self.setMask(region)
+  #   region_ = QRegion(path.toFillPolygon().toPolygon())
+  #   self.setMask(region_)
 
   def blurBackground(self):
     self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -76,7 +90,7 @@ class Window(QMainWindow):
       formatted_date = dt_obj.strftime("%B %d")
       return formatted_date
 
-    stock = "AAPL"
+    # stock = "AAPL"
     data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # print(data.to_markdown())
@@ -118,14 +132,15 @@ class Window(QMainWindow):
 
     formatted_dates = [format_x_label(str(label)) for label in data['Datetime'][::label_every_x_datapoints]]
     
-    # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
-    prev_week = None
-    for i, formatted_date in enumerate(formatted_dates):
-      date_obj = datetime.strptime(formatted_date, "%B %d")
-      if prev_week is not None and prev_week != date_obj.isocalendar()[1]:
-          # Draw a vertical line at position i
-          ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
-      prev_week = date_obj.isocalendar()[1]
+    if (monday_lines):
+      # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
+      prev_week = None
+      for i, formatted_date in enumerate(formatted_dates):
+        date_obj = datetime.strptime(formatted_date, "%B %d")
+        if prev_week is not None and prev_week != date_obj.isocalendar()[1]:
+            # Draw a vertical line at position i
+            ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
+        prev_week = date_obj.isocalendar()[1]
 
     # # Loop through the formatted dates and draw vertical lines after each date change
     # prev_formatted_date = None
