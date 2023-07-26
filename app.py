@@ -35,7 +35,7 @@ class Window(QMainWindow):
   def __init__(self):
     super(Window, self).__init__(parent=None)
     self.setWindowTitle("no title")
-    # self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+    self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
     # self.resize(400, 300)
 
     self.blurBackground()
@@ -78,6 +78,7 @@ class Window(QMainWindow):
 
     stock = "AAPL"
     data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # print(data.to_markdown())
     # print(data)
 
@@ -92,22 +93,51 @@ class Window(QMainWindow):
     # Create a subplot and plot the stock data
     ax = self.figure.add_subplot(111)
     ax.xaxis.set_major_formatter(formatter)
-    data['Close'].plot(ax=ax, color='green')
+    data['Close'].plot(ax=ax, color='#4ece6f')
+    # Fill the area below the stock price line with a color
+    ax.fill_between(data.index, data['Close'], color='green', alpha=0.3, zorder=-1)
 
     # Customize the plot
-    ax.set_xlabel('Date', color='white', fontsize=10, rotation=45)
+    ax.set_xlabel('Date', color='white', fontsize=10)
     ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
     ax.set_title(f'{stock} Stock Price Chart', color='white', fontsize=10)
     ax.set_facecolor('none')
-
+    ax.tick_params(which='minor', size=0)
     ax.tick_params(color='white', labelcolor='white')
 
-    self.figure.set_size_inches(10, 6)
+    self.figure.set_size_inches(10, 7)
+    
+    # Set y-axis limits to avoid the graph from being pushed up
+    ymin = data['Close'].min()
+    ymax = data['Close'].max()
+    padding = 0.1 * (ymax - ymin)
+    ax.set_ylim(ymin - padding, ymax + padding)
 
     x_labels = range(len(data['Datetime']))
     label_every_x_datapoints = 20
+
+    formatted_dates = [format_x_label(str(label)) for label in data['Datetime'][::label_every_x_datapoints]]
+    
+    # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
+    prev_week = None
+    for i, formatted_date in enumerate(formatted_dates):
+      date_obj = datetime.strptime(formatted_date, "%B %d")
+      if prev_week is not None and prev_week != date_obj.isocalendar()[1]:
+          # Draw a vertical line at position i
+          ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
+      prev_week = date_obj.isocalendar()[1]
+
+    # # Loop through the formatted dates and draw vertical lines after each date change
+    # prev_formatted_date = None
+    # for i, formatted_date in enumerate(formatted_dates):
+    #     if prev_formatted_date is not None and prev_formatted_date != formatted_date:
+    #         # Draw a vertical line at position i
+    #         ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
+    #     prev_formatted_date = formatted_date
+
     plt.xticks(x_labels[::label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::label_every_x_datapoints]], rotation=45, ha='right', color='white') # Rotate the x-axis labels for better readability
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
+    # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
     plt.yticks(color='white')  # Set y tick labels text color to white
 
