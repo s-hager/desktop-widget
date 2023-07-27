@@ -1,5 +1,5 @@
 from PyQt6 import QtGui
-from PyQt6.QtWidgets import QMainWindow, QApplication
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip
 from PyQt6.QtCore import Qt, QSize, QPoint, QObject, QEvent, QRectF
 from PyQt6.QtGui import QGuiApplication, QPainter, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
@@ -30,6 +30,8 @@ vertical_lines_transparency = 0.5
 vertical_lines_width = 0.5
 padding_multiplier = 0.1
 y_label_every_x_datapoints = 100
+center_window = True
+drag_window = True
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -80,25 +82,24 @@ class Window(QMainWindow):
     self.figure = plt.figure()
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0)
+    self.figure.patch.set_alpha(0.1) #TODO bad solution (actually should be 0 but then only graph instead of entire window is draggable)
     self.setCentralWidget(self.canvas)
     self.canvas.installEventFilter(self)
 
     # Call the method to plot the stock graph
     self.plot_stock()
 
-    # Center the window on the screen
-    self.centerWindow()
+    if center_window:
+      # Center the window on the screen
+      self.centerWindow()
 
-  def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-    # Handle mouse events for the canvas and forward them to the window
-    if obj == self.canvas and event.type() == QEvent.Type.MouseButtonPress:
-        self.mousePressEvent(event)
-    elif obj == self.canvas and event.type() == QEvent.Type.MouseMove:
-        self.mouseMoveEvent(event)
-    elif obj == self.canvas and event.type() == QEvent.Type.MouseButtonRelease:
-        self.mouseReleaseEvent(event)
-    return super().eventFilter(obj, event)
+    self.gripSize = 16
+    self.grips = []
+    for i in range(4):
+      grip = QSizeGrip(self)
+      grip.resize(self.gripSize, self.gripSize)
+      self.grips.append(grip)
+
 
   # def roundCorners(self):
   #   # Create a QPainterPath with rounded corners
@@ -117,52 +118,33 @@ class Window(QMainWindow):
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
+  def resizeEvent(self, event):
+    QMainWindow.resizeEvent(self, event)
+    rect = self.rect()
+    # top left grip doesn't need to be moved...
+    # top right
+    self.grips[1].move(rect.right() - self.gripSize, 0)
+    # bottom right
+    self.grips[2].move(
+        rect.right() - self.gripSize, rect.bottom() - self.gripSize)
+    # bottom left
+    self.grips[3].move(0, rect.bottom() - self.gripSize)
+    time.sleep(0.01)
+
   def centerWindow(self):
     frame_geometry = self.frameGeometry()
     screen_center = QGuiApplication.primaryScreen().availableGeometry().center()
     frame_geometry.moveCenter(screen_center)
     self.move(frame_geometry.topLeft())
 
-  # def mousePressEvent(self, event):
-  #   self.drag_start_position = event.globalPos()
-
-  # def mouseMoveEvent(self, event):
-  #   delta = QPoint(event.globalPos() - self.drag_start_position())
-  #   print(delta)
-
-  # def mousePressEvent(self, event):
-  #   # Get the current mouse position relative to the window's top-left corner
-  #   self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-
-  # def mouseMoveEvent(self, event):
-  #   # If the user has pressed the left mouse button, move the window
-  #   if event.buttons() == Qt.MouseButton.LeftButton:
-  #     # Calculate the new window position based on the mouse movement
-  #     new_position = event.globalPos() - self.drag_position
-  #     self.move(new_position)
-
-  # def mouseReleaseEvent(self, event):
-  #   # Clear the drag position when the mouse button is released
-  #   self.drag_position = None
-
-  def mousePressEvent(self, event):
-    # if event.button() == Qt.MouseButton.LeftButton:
-      # Store the initial position of the mouse press
+  if drag_window:
+    def mousePressEvent(self, event):
       self.drag_start_position = event.globalPosition().toPoint()
-      # event.accept()
 
-  def mouseMoveEvent(self, event):
-    # if event.buttons() & Qt.MouseButton.LeftButton:
-      # Calculate the new position of the window
+    def mouseMoveEvent(self, event):
       delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
       self.move(self.x() + delta.x(), self.y() + delta.y())
       self.drag_start_position = event.globalPosition().toPoint()
-      # event.accept()
-
-  # def mouseReleaseEvent(self, event):
-  #   # Reset the drag_start_position when the mouse is released
-  #   self.drag_start_position = None
-  #   event.accept()
 
   def blurBackground(self):
     self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -206,15 +188,19 @@ class Window(QMainWindow):
     # Customize the plot
     # ax.set_xlabel('Date', color='white', fontsize=10)
     # ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
-    ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
+    # ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
     ax.set_facecolor('none')
     ax.tick_params(which='minor', size=0)
     ax.tick_params(color=legend_color, labelcolor=legend_color)
+    ax.tick_params(left = False, bottom = False)
     # Remove left and right margins
     ax.margins(x=0)
+    # Remove graph frame (borders)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
 
-    self.figure.set_size_inches(10, 7)
-    
     # Set y-axis limits to avoid the area graph from being pushed up
     ymin = data['Close'].min()
     ymax = data['Close'].max()
@@ -240,16 +226,21 @@ class Window(QMainWindow):
       y_ticks_positions = ax.get_yticks()
       for y_tick_position in y_ticks_positions:
         ax.axhline(y_tick_position, color=vertical_lines_color, alpha=vertical_lines_transparency, linestyle=vertical_lines_style, linewidth=vertical_lines_width)
+        plt.text(i * 100, -0.05, format_x_label(str(label)), ha='center', color='white')
 
-    # # Loop through the formatted dates and draw vertical lines after each date change
-    # prev_formatted_date = None
-    # for i, formatted_date in enumerate(formatted_dates):
-    #     if prev_formatted_date is not None and prev_formatted_date != formatted_date:
-    #         # Draw a vertical line at position i
-    #         ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
-    #     prev_formatted_date = formatted_date
+      # # Loop through the formatted dates and draw vertical lines after each date change
+      # prev_formatted_date = None
+      # for i, formatted_date in enumerate(formatted_dates):
+      #     if prev_formatted_date is not None and prev_formatted_date != formatted_date:
+      #         # Draw a vertical line at position i
+      #         ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
 
-    plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]], ha='right', color=legend_color) # Rotate the x-axis labels for better readability
+      #         # Add x tick label at position i
+      #         plt.text(i * label_every_x_datapoints, -0.05, format_x_label(str(label)), ha='center', color='white')
+          # prev_formatted_date = formatted_date
+
+
+    plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
     # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
