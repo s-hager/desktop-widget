@@ -1,6 +1,6 @@
 from PyQt6 import QtGui
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip
-from PyQt6.QtCore import Qt, QSize, QPoint, QObject, QEvent, QRectF
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QObject, QEvent, QRectF
 from PyQt6.QtGui import QGuiApplication, QPainter, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import time
@@ -20,18 +20,19 @@ chart_line_color = '#4ece6f'
 area_chart = True
 monday_lines = True
 monday_lines_color = 'white'
-monday_lines_style = 'solid'
+monday_lines_style = 'solid' # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
 monday_lines_transparency = 0.5
 monday_lines_width = 1
-vertical_lines = True
-vertical_lines_color = 'white'
-vertical_lines_style = (0, (5, 10))
-vertical_lines_transparency = 0.5
-vertical_lines_width = 0.5
+horizontal_lines = True
+horizontal_lines_color = 'white'
+horizontal_lines_style = (0, (5, 10)) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
+horizontal_lines_transparency = 0.5
+horizontal_lines_width = 0.5
 padding_multiplier = 0.1
 y_label_every_x_datapoints = 100
 center_window = True
 drag_window = True
+refresh_interval = 3600 # seconds
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -74,25 +75,35 @@ class Window(QMainWindow):
     size_relative_to_screen = QSize(int(screen_size.width() * fraction_of_screen),
                                     int(screen_size.height() * fraction_of_screen))
     self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
-
-    # Initialize variables to track the mouse position
-    # self.drag_start_position = self.pos()
-
+    
     # Create a Figure and Canvas for Matplotlib plot
     self.figure = plt.figure()
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0.1) #TODO bad solution (actually should be 0 but then only graph instead of entire window is draggable)
-    self.setCentralWidget(self.canvas)
-    self.canvas.installEventFilter(self)
+    self.figure.patch.set_alpha(0.1) #TODO not ideal solution (actually should be 0 but then only graph instead of entire window is draggable)
+    # self.setCentralWidget(self.canvas)
+    # self.canvas.installEventFilter(self)
 
-    # Call the method to plot the stock graph
-    self.plot_stock()
+    self.canvas.setStyleSheet("border: 1px solid red;") # canvas is a widget
+
+    # Add the title bar and canvas to a vertical layout
+    layout = QVBoxLayout()
+    layout.addWidget(self.titleWidget())
+    layout.addWidget(self.canvas)
+    layout.setContentsMargins(0, 0, 0, 0)
+
+    # Create a central widget to hold the layout
+    central_widget = QWidget()
+    central_widget.setLayout(layout)
+    self.setCentralWidget(central_widget)
+
+    self.canvas.installEventFilter(self)
 
     if center_window:
       # Center the window on the screen
       self.centerWindow()
 
+    # Add resize grips
     self.gripSize = 16
     self.grips = []
     for i in range(4):
@@ -100,6 +111,10 @@ class Window(QMainWindow):
       grip.resize(self.gripSize, self.gripSize)
       self.grips.append(grip)
 
+    # Call the method to plot the stock graph
+    self.plotStock()
+
+    self.startRefreshTimer()
 
   # def roundCorners(self):
   #   # Create a QPainterPath with rounded corners
@@ -117,6 +132,19 @@ class Window(QMainWindow):
 
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
+
+  def titleWidget(self):
+    title_widget = QLabel("Test Title")
+    title_widget.setStyleSheet("border: 1px solid red;")
+    return title_widget
+
+  def startRefreshTimer(self):
+    # Create a QTimer object
+    self.refresh_timer = QTimer(self)
+    # Connect the timer's timeout signal to the plot_stock method
+    self.refresh_timer.timeout.connect(self.plotStock)
+    # Start the timer with the specified refresh_interval in milliseconds
+    self.refresh_timer.start(refresh_interval * 1000)
 
   def resizeEvent(self, event):
     QMainWindow.resizeEvent(self, event)
@@ -154,7 +182,7 @@ class Window(QMainWindow):
     # self.setStyleSheet("background-color: rgba(123, 123, 123, 123)")
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0)")
 
-  def plot_stock(self):
+  def plotStock(self):
     # Function to convert datetime string to "July 26" format
     def format_x_label(datetime_str):
       # Parse the datetime string to a datetime object
@@ -207,11 +235,8 @@ class Window(QMainWindow):
     padding = padding_multiplier * (ymax - ymin)
     ax.set_ylim(ymin - padding, ymax + padding)
 
-    x_labels = range(len(data['Datetime']))
-
-    formatted_dates = [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]]
-    
     if (monday_lines):
+      formatted_dates = [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]]
       # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
       prev_week = None
       for i, formatted_date in enumerate(formatted_dates):
@@ -221,12 +246,11 @@ class Window(QMainWindow):
             ax.axvline(i * y_label_every_x_datapoints, color=monday_lines_color, alpha=monday_lines_transparency, linestyle=monday_lines_style, linewidth=monday_lines_width)
         prev_week = date_obj.isocalendar()[1]
 
-    if (vertical_lines):
-      # Add vertical lines at every y-tick position
+    if horizontal_lines:
+      # Add horizontal lines at every y-tick position
       y_ticks_positions = ax.get_yticks()
       for y_tick_position in y_ticks_positions:
-        ax.axhline(y_tick_position, color=vertical_lines_color, alpha=vertical_lines_transparency, linestyle=vertical_lines_style, linewidth=vertical_lines_width)
-        plt.text(i * 100, -0.05, format_x_label(str(label)), ha='center', color='white')
+        ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
 
       # # Loop through the formatted dates and draw vertical lines after each date change
       # prev_formatted_date = None
@@ -240,6 +264,7 @@ class Window(QMainWindow):
           # prev_formatted_date = formatted_date
 
 
+    x_labels = range(len(data['Datetime']))
     plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
     # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
@@ -250,6 +275,8 @@ class Window(QMainWindow):
     for spine in ax.spines.values():
       spine.set_color(legend_color)
 
+
+    # plt.tight_layout()
     # Refresh the canvas to update the plot
     self.canvas.draw()
 
