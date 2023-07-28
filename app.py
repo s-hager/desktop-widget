@@ -1,11 +1,12 @@
 from PyQt6 import QtGui
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QObject, QEvent, QRectF
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QPainter, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.ticker import Formatter, FixedLocator
 from datetime import datetime
@@ -35,7 +36,7 @@ title_font_size = 20
 center_window = True
 drag_window = True
 refresh_interval = 3600 # seconds
-debug = True # disable for pyinstaller
+debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -66,6 +67,7 @@ class CustomFormatter(Formatter):
 class Window(QMainWindow):
   def __init__(self):
     super(Window, self).__init__(parent=None)
+    self.drag_start_position = None
     if debug:
       print("Start Creating Window")
     self.setWindowTitle("no title")
@@ -89,8 +91,8 @@ class Window(QMainWindow):
     self.figure = plt.figure()
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0)
-    self.canvas.setStyleSheet("border: 1px solid red;") # canvas is a widget
+    self.figure.patch.set_alpha(0.5)
+    # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
 
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
     if debug:
@@ -105,11 +107,16 @@ class Window(QMainWindow):
     self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
 
     # Add the title bar and canvas to a vertical layout
+
+    self.title_widget = self.titleWidget()
+    self.title_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+    self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     layout = QVBoxLayout()
-    layout.addWidget(self.titleWidget())
+    layout.addWidget(self.title_widget)
     layout.addWidget(self.canvas)
     layout.setSpacing(0)
     layout.setContentsMargins(15, 15, 15, 15)
+    # layout.setContentsMargins(0, 0, 0, 0)
 
     # Create a central widget to hold the layout
     central_widget = QWidget()
@@ -235,20 +242,41 @@ class Window(QMainWindow):
     frame_geometry.moveCenter(screen_center)
     self.move(frame_geometry.topLeft())
 
+  def is_mouse_inside_grip(self, pos):
+    print(pos)
+    for grip in self.grips:
+      if grip.geometry().contains(pos):
+        return True
+    return False
+
   if drag_window:
     def mousePressEvent(self, event):
-      self.drag_start_position = event.globalPosition().toPoint()
+      print("press")
+      self.candidate_start_position = event.globalPosition().toPoint()
+      # if not self.is_mouse_inside_grip(self.candidate_start_position):
+      if not self.is_mouse_inside_grip(event.pos()):
+        self.drag_start_position = self.candidate_start_position
+
+    def mouseReleaseEvent(self, event):
+      print("release")
+      if event.button() == 1:  # Left mouse button
+        self.drag_start_position = None
 
     def mouseMoveEvent(self, event):
-      delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
-      self.move(self.x() + delta.x(), self.y() + delta.y())
-      self.drag_start_position = event.globalPosition().toPoint()
+      print("move")
+      if self.drag_start_position is not None and not self.is_mouse_inside_grip(self.drag_start_position):
+        delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
+        self.move(self.x() + delta.x(), self.y() + delta.y())
+        self.drag_start_position = event.globalPosition().toPoint()
 
   def blurBackground(self):
     # GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
     GlobalBlur(self.winId(), Dark=True, Acrylic=False, QWidget=self)
     # self.setStyleSheet("background-color: lightgrey")
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0)")
+
+  def format_y_tick_label(self, value, pos):
+    return f"{self.currency_symbol}{value:.2f}"
 
   def plotStock(self):
     # Function to convert datetime string to "July 26" format
@@ -269,16 +297,20 @@ class Window(QMainWindow):
 
     # print(data['Datetime'])
 
+    # So that days where no market activity took place are omitted instead of drawn as a straight line 
     formatter = CustomFormatter(self.data['Datetime'])
+
     # Clear the existing plot
     self.figure.clear()
 
     # Create a subplot and plot the stock data
     ax = self.figure.add_subplot(111)
     ax.xaxis.set_major_formatter(formatter)
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(self.format_y_tick_label))
     self.data['Close'].plot(ax=ax, color=chart_line_color)
+
     # Fill the area below the stock price line with a color
-    if (area_chart):
+    if area_chart:
       ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color, alpha=0.3, zorder=-1)
 
     # Customize the plot
@@ -305,7 +337,7 @@ class Window(QMainWindow):
     padding = padding_multiplier * (ymax - ymin)
     ax.set_ylim(ymin - padding, ymax + padding)
 
-    if (monday_lines):
+    if monday_lines:
       formatted_dates = [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]]
       # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
       prev_week = None
