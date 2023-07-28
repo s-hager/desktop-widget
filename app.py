@@ -35,6 +35,7 @@ title_font_size = 20
 center_window = True
 drag_window = True
 refresh_interval = 3600 # seconds
+debug = True # disable for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -48,18 +49,6 @@ refresh_interval = 3600 # seconds
 # make corners rounded
 # make transparency better (without time.sleep)
 # create options menu
-
-def replaceCurrencySymbols(text):
-  currency_symbols = {
-      "USD": "$",
-      "EUR": "€",
-      "JPY": "¥",
-      "GBP": "£",
-  }
-  for currency_code, currency_symbol in currency_symbols.items():
-      text = text.replace(currency_code, currency_symbol)
-  return text
-
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -77,11 +66,17 @@ class CustomFormatter(Formatter):
 class Window(QMainWindow):
   def __init__(self):
     super(Window, self).__init__(parent=None)
+    if debug:
+      print("Start Creating Window")
     self.setWindowTitle("no title")
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
+    if debug:
+      print("Blurring Background...")
     self.blurBackground()
-    # self.roundCorners()
+    if debug:
+      print("Done")
+    # self.roundCorners() # TODO
 
     # Set the window's size to a fraction of the screen's size
     screen_size = QApplication.primaryScreen().size()  # Get the screen's size
@@ -94,30 +89,34 @@ class Window(QMainWindow):
     self.figure = plt.figure()
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0.1) #TODO not ideal solution (actually should be 0 but then only graph instead of entire window is draggable)
-    # self.setCentralWidget(self.canvas)
-    # self.canvas.installEventFilter(self)
-
+    self.figure.patch.set_alpha(0)
     self.canvas.setStyleSheet("border: 1px solid red;") # canvas is a widget
 
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-    self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    if debug:
+      print("Downloading Stock Data...")
+      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    else:
+      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
     self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+    
     # Get stock currency
-    self.currency_symbol = replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
+    self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
 
     # Add the title bar and canvas to a vertical layout
     layout = QVBoxLayout()
     layout.addWidget(self.titleWidget())
     layout.addWidget(self.canvas)
     layout.setSpacing(0)
-    layout.setContentsMargins(20, 20, 20, 20)
+    layout.setContentsMargins(15, 15, 15, 15)
 
     # Create a central widget to hold the layout
     central_widget = QWidget()
     central_widget.setLayout(layout)
     self.setCentralWidget(central_widget)
+    if debug:
+      central_widget.setStyleSheet("border: 1px solid red;")
 
     self.canvas.installEventFilter(self)
 
@@ -132,6 +131,8 @@ class Window(QMainWindow):
       grip = QSizeGrip(self)
       grip.resize(self.gripSize, self.gripSize)
       self.grips.append(grip)
+      if debug:
+        grip.setStyleSheet("background-color: red;")
 
     # Call the method to plot the stock graph
     self.plotStock()
@@ -157,6 +158,17 @@ class Window(QMainWindow):
 
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
+
+  def replaceCurrencySymbols(self, text):
+    currency_symbols = {
+        "USD": "$",
+        "EUR": "€",
+        "JPY": "¥",
+        "GBP": "£",
+    }
+    for currency_code, currency_symbol in currency_symbols.items():
+        text = text.replace(currency_code, currency_symbol)
+    return text
 
   def resource_path(self, relative_path):
     # Get absolute path to resource, works for dev and for PyInstaller
@@ -184,12 +196,11 @@ class Window(QMainWindow):
     QCoreApplication.quit()
 
   def titleWidget(self):
-    # print(type(self.data))
-    # print(self.data.columns)
     title = QLabel(f"{stock.upper()} {self.currency_symbol}{round(self.data['Close'].iloc[-1], 2)}")
-    # title.setAlignment(Qt.AlignmentFlag.AlignLeft)
-    title.setStyleSheet(f"color:{legend_color};")
-    # title.setStyleSheet("color:white; border: 1px solid red;")
+    if debug:
+      title.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
+    else:
+      title.setStyleSheet(f"color:{legend_color};")
     font = QFont()
     font.setPointSize(title_font_size)
     title.setFont(font)
@@ -200,6 +211,8 @@ class Window(QMainWindow):
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
     self.refresh_timer.timeout.connect(self.plotStock)
+    if debug:
+      self.refresh_timer.timeout.connect(lambda: print("Refreshing Data"))
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
@@ -232,11 +245,9 @@ class Window(QMainWindow):
       self.drag_start_position = event.globalPosition().toPoint()
 
   def blurBackground(self):
-    self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
     # GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
     GlobalBlur(self.winId(), Dark=True, Acrylic=False, QWidget=self)
-    # GlobalBlur(self.winId())
-    # self.setStyleSheet("background-color: rgba(123, 123, 123, 123)")
+    # self.setStyleSheet("background-color: lightgrey")
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0)")
 
   def plotStock(self):
@@ -248,6 +259,8 @@ class Window(QMainWindow):
       formatted_date = dt_obj.strftime("%B %d")
       return formatted_date
 
+    if debug:
+      print("Plotting Stock...")
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -323,6 +336,8 @@ class Window(QMainWindow):
     plt.tight_layout()
     # Refresh the canvas to update the plot
     self.canvas.draw()
+    if debug:
+      print("Done")
 
 if __name__ == '__main__':
   import sys
