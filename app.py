@@ -1,9 +1,10 @@
 from PyQt6 import QtGui
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QObject, QEvent, QRectF
-from PyQt6.QtGui import QGuiApplication, QPainter, QRegion, QPainterPath
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QObject, QEvent, QRectF
+from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QPainter, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import time
+import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.ticker import Formatter, FixedLocator
@@ -30,6 +31,7 @@ horizontal_lines_transparency = 0.5
 horizontal_lines_width = 0.5
 padding_multiplier = 0.1
 y_label_every_x_datapoints = 100
+title_font_size = 20
 center_window = True
 drag_window = True
 refresh_interval = 3600 # seconds
@@ -46,6 +48,18 @@ refresh_interval = 3600 # seconds
 # make corners rounded
 # make transparency better (without time.sleep)
 # create options menu
+
+def replaceCurrencySymbols(text):
+  currency_symbols = {
+      "USD": "$",
+      "EUR": "€",
+      "JPY": "¥",
+      "GBP": "£",
+  }
+  for currency_code, currency_symbol in currency_symbols.items():
+      text = text.replace(currency_code, currency_symbol)
+  return text
+
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -86,11 +100,19 @@ class Window(QMainWindow):
 
     self.canvas.setStyleSheet("border: 1px solid red;") # canvas is a widget
 
+    # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
+    self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
+    self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+    # Get stock currency
+    self.currency_symbol = replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
+
     # Add the title bar and canvas to a vertical layout
     layout = QVBoxLayout()
     layout.addWidget(self.titleWidget())
     layout.addWidget(self.canvas)
-    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+    layout.setContentsMargins(20, 20, 20, 20)
 
     # Create a central widget to hold the layout
     central_widget = QWidget()
@@ -116,6 +138,9 @@ class Window(QMainWindow):
 
     self.startRefreshTimer()
 
+    # Create tray icon
+    self.trayIcon()
+
   # def roundCorners(self):
   #   # Create a QPainterPath with rounded corners
   #   path = QPainterPath()
@@ -133,10 +158,42 @@ class Window(QMainWindow):
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
+  def resource_path(self, relative_path):
+    # Get absolute path to resource, works for dev and for PyInstaller
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+  def trayIcon(self):
+    # Create the system tray icon
+    self.tray_icon = QSystemTrayIcon(self)
+    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
+
+    # Create a menu for the system tray icon
+    self.tray_menu = QMenu()
+    self.quit_action = QAction("Quit", self)
+    self.quit_action.triggered.connect(self.quitApp)
+    self.tray_menu.addAction(self.quit_action)
+
+    # Add the menu to the system tray icon
+    self.tray_icon.setContextMenu(self.tray_menu)
+
+    # Show the system tray icon
+    self.tray_icon.show()
+
+  def quitApp(self):
+    QCoreApplication.quit()
+
   def titleWidget(self):
-    title_widget = QLabel("Test Title")
-    title_widget.setStyleSheet("border: 1px solid red;")
-    return title_widget
+    # print(type(self.data))
+    # print(self.data.columns)
+    title = QLabel(f"{stock.upper()} {self.currency_symbol}{round(self.data['Close'].iloc[-1], 2)}")
+    # title.setAlignment(Qt.AlignmentFlag.AlignLeft)
+    title.setStyleSheet(f"color:{legend_color};")
+    # title.setStyleSheet("color:white; border: 1px solid red;")
+    font = QFont()
+    font.setPointSize(title_font_size)
+    title.setFont(font)
+    return title
 
   def startRefreshTimer(self):
     # Create a QTimer object
@@ -192,26 +249,24 @@ class Window(QMainWindow):
       return formatted_date
 
     # stock = "AAPL"
-    data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # print(data.to_markdown())
     # print(data)
 
-    data = data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
-    data['Datetime'] = pd.to_datetime(data['Datetime'])
     # print(data['Datetime'])
 
-    formatter = CustomFormatter(data['Datetime'])
+    formatter = CustomFormatter(self.data['Datetime'])
     # Clear the existing plot
     self.figure.clear()
 
     # Create a subplot and plot the stock data
     ax = self.figure.add_subplot(111)
     ax.xaxis.set_major_formatter(formatter)
-    data['Close'].plot(ax=ax, color=chart_line_color)
+    self.data['Close'].plot(ax=ax, color=chart_line_color)
     # Fill the area below the stock price line with a color
     if (area_chart):
-      ax.fill_between(data.index, data['Close'], color=chart_area_color, alpha=0.3, zorder=-1)
+      ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color, alpha=0.3, zorder=-1)
 
     # Customize the plot
     # ax.set_xlabel('Date', color='white', fontsize=10)
@@ -228,15 +283,17 @@ class Window(QMainWindow):
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
+    # ax.autoscale()
+    self.figure.set_size_inches(5, 2)
 
     # Set y-axis limits to avoid the area graph from being pushed up
-    ymin = data['Close'].min()
-    ymax = data['Close'].max()
+    ymin = self.data['Close'].min()
+    ymax = self.data['Close'].max()
     padding = padding_multiplier * (ymax - ymin)
     ax.set_ylim(ymin - padding, ymax + padding)
 
     if (monday_lines):
-      formatted_dates = [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]]
+      formatted_dates = [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]]
       # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
       prev_week = None
       for i, formatted_date in enumerate(formatted_dates):
@@ -252,20 +309,8 @@ class Window(QMainWindow):
       for y_tick_position in y_ticks_positions:
         ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
 
-      # # Loop through the formatted dates and draw vertical lines after each date change
-      # prev_formatted_date = None
-      # for i, formatted_date in enumerate(formatted_dates):
-      #     if prev_formatted_date is not None and prev_formatted_date != formatted_date:
-      #         # Draw a vertical line at position i
-      #         ax.axvline(i * label_every_x_datapoints, color='white', linestyle='dashed', linewidth=1)
-
-      #         # Add x tick label at position i
-      #         plt.text(i * label_every_x_datapoints, -0.05, format_x_label(str(label)), ha='center', color='white')
-          # prev_formatted_date = formatted_date
-
-
-    x_labels = range(len(data['Datetime']))
-    plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
+    x_labels = range(len(self.data['Datetime']))
+    plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
     # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
@@ -275,8 +320,7 @@ class Window(QMainWindow):
     for spine in ax.spines.values():
       spine.set_color(legend_color)
 
-
-    # plt.tight_layout()
+    plt.tight_layout()
     # Refresh the canvas to update the plot
     self.canvas.draw()
 
@@ -289,5 +333,4 @@ if __name__ == '__main__':
   app = QApplication(sys.argv)
   window = Window()
   window.show()
-
   sys.exit(app.exec())
