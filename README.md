@@ -11,4 +11,4 @@ pyinstaller app.py --paths=./venv/lib/site-packages --onefile
 pyinstaller app.py --onefile --paths=./venv/lib/site-packages --add-data "icon.ico;."
 
 ### then set console to false in app.spec and rebuild with
-pyinsatller app.spec
+pyinstaller app.spec

@@ -5,6 +5,7 @@ from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QPainte
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
+import winreg as reg
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -37,10 +38,11 @@ update_font_size = 8
 center_window = True
 drag_window = True
 display_update_time = True
-# refresh_interval = 3600 # seconds
-refresh_interval = 20 # seconds
+refresh_interval = 3600 # seconds
+# refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-debug = True # set to False for pyinstaller
+debug = False # set to False for pyinstaller
+# debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -56,6 +58,9 @@ debug = True # set to False for pyinstaller
 # create options menu
 # add last refreshed time
 # 'cache' x axis date labels so that they dont have to be recalculated every time when resizing
+# remove unnecessary resize event(s) at start
+# make resizing smoother
+# base amount of y axis tick labels on window size
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -80,7 +85,7 @@ class Window(QMainWindow):
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
     if debug:
-      print("Blurring Background...")
+      print("Blurring Background...", end="")
     self.blurBackground()
     if debug:
       print("Done")
@@ -113,6 +118,10 @@ class Window(QMainWindow):
     self.title_widget = self.titleWidget()
     self.title_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
     self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    
+    # Call the method to plot the stock graph on the canvas
+    # self.plotStock()
+
     layout = QVBoxLayout()
     layout.addWidget(self.title_widget)
     layout.addWidget(self.canvas)
@@ -144,9 +153,6 @@ class Window(QMainWindow):
       self.grips.append(grip)
       if debug:
         grip.setStyleSheet("background-color: red;")
-
-    # Call the method to plot the stock graph
-    self.plotStock()
 
     self.startRefreshTimer()
 
@@ -205,8 +211,11 @@ class Window(QMainWindow):
     # Create a menu for the system tray icon
     self.tray_menu = QMenu()
     self.quit_action = QAction("Quit", self)
+    self.startup_action = QAction("Enable Launch on Startup", self)
     self.quit_action.triggered.connect(self.quitApp)
+    self.startup_action.triggered.connect(self.startup)
     self.tray_menu.addAction(self.quit_action)
+    self.tray_menu.addAction(self.startup_action)
 
     # Add the menu to the system tray icon
     self.tray_icon.setContextMenu(self.tray_menu)
@@ -216,6 +225,22 @@ class Window(QMainWindow):
 
   def quitApp(self):
     QCoreApplication.quit()   
+
+  def startup(self):
+    app_name="StockWidget"
+    app_path=os.path.abspath(r"D:\Personal\Privat\Programming\desktop-widget\dist\app.exe")
+    value_name = app_name
+    value_data = app_path
+    print("Work in Progress")
+    # try:
+    #     key = reg.HKEY_CURRENT_USER
+    #     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    #     reg.CreateKey(key, key_path)
+    #     print(value_name)
+    #     reg.SetValueEx(key, value_name, 0, reg.REG_SZ, value_data)
+    #     print("Successfully added to startup.")
+    # except Exception as e:
+    #     print(f"Failed to add to startup. Error: {str(e)}")
 
   def refreshTimeLabel(self):
     self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
@@ -231,7 +256,8 @@ class Window(QMainWindow):
 
   def updateRefreshTimeLabel(self):
     self.refresh_time_label.setText(self.update_time)
-    print(f"Updated Refresh Time to {self.update_time}")
+    if debug:
+      print(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
     title = QLabel(f"{stock.upper()} {self.currency_symbol}{round(self.data['Close'].iloc[-1], 2)}")
@@ -249,15 +275,19 @@ class Window(QMainWindow):
     # Create a QTimer object
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
+    if debug:
+      self.refresh_timer.timeout.connect(lambda: print("Refreshing Plot..."))
     self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
     self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
     if debug:
-      self.refresh_timer.timeout.connect(lambda: print("Refreshing Data"))
+      self.refresh_timer.timeout.connect(lambda: print("Done"))
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
   def resizeEvent(self, event):
+    if debug:
+      print("Resize Event")
     QMainWindow.resizeEvent(self, event)
     rect = self.rect()
     # top left grip doesn't need to be moved...
@@ -268,7 +298,8 @@ class Window(QMainWindow):
         rect.right() - self.gripSize, rect.bottom() - self.gripSize)
     # bottom left
     self.grips[3].move(0, rect.bottom() - self.gripSize)
-    time.sleep(0.01)
+    self.plotStock() # replot stock to adjust to new window size
+    # time.sleep(0.01)
 
   def centerWindow(self):
     frame_geometry = self.frameGeometry()
@@ -322,7 +353,7 @@ class Window(QMainWindow):
       return formatted_date
 
     if debug:
-      print("Plotting Stock...")
+      print("Plotting Stock...", end="")
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -413,7 +444,7 @@ class Window(QMainWindow):
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
     plt.yticks(color=legend_color)  # Set y tick labels text color to white
 
-    plt.tight_layout(pad=0.1) # 0.1 so that right border is still visible with small window size
+    plt.tight_layout(pad=0.1) # TODO 0.1 otherwise right border is not visible
     # plt.autoscale(axis='x')
     # Refresh the canvas to update the plot
     self.canvas.draw()
@@ -429,7 +460,7 @@ if __name__ == '__main__':
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
   if debug:
-    print("Creating Application...")
+    print("Creating Application...", end="")
   app = QApplication(sys.argv)
   if debug:
     print("Done")
@@ -437,4 +468,5 @@ if __name__ == '__main__':
   if debug:
     print("Showing Window")
   window.show()
+  window.plotStock()
   sys.exit(app.exec())
