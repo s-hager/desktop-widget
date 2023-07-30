@@ -30,12 +30,16 @@ horizontal_lines_color = 'white'
 horizontal_lines_style = (0, (5, 10)) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
 horizontal_lines_transparency = 0.5
 horizontal_lines_width = 0.5
-padding_multiplier = 0.1
+padding_multiplier = 0.5
 y_label_every_x_datapoints = 100
 title_font_size = 20
+update_font_size = 8
 center_window = True
 drag_window = True
-refresh_interval = 3600 # seconds
+display_update_time = True
+# refresh_interval = 3600 # seconds
+refresh_interval = 20 # seconds
+window_margins = [10, 10, 10, 10]
 debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
@@ -50,6 +54,8 @@ debug = True # set to False for pyinstaller
 # make corners rounded
 # make transparency better (without time.sleep)
 # create options menu
+# add last refreshed time
+# 'cache' x axis date labels so that they dont have to be recalculated every time when resizing
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -88,21 +94,17 @@ class Window(QMainWindow):
     self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
     
     # Create a Figure and Canvas for Matplotlib plot
-    self.figure = plt.figure()
+    if debug:
+      self.figure = plt.figure(facecolor='blue')
+    else:
+      self.figure = plt.figure()
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0.5)
+    self.figure.patch.set_alpha(0)
     # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
-
-    # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-    if debug:
-      print("Downloading Stock Data...")
-      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    else:
-      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
-    self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
     
+    self.downloadStockData()
+
     # Get stock currency
     self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
 
@@ -114,8 +116,10 @@ class Window(QMainWindow):
     layout = QVBoxLayout()
     layout.addWidget(self.title_widget)
     layout.addWidget(self.canvas)
+    if display_update_time:
+      layout.addWidget(self.refreshTimeLabel())
     layout.setSpacing(0)
-    layout.setContentsMargins(15, 15, 15, 15)
+    layout.setContentsMargins(*window_margins)
     # layout.setContentsMargins(0, 0, 0, 0)
 
     # Create a central widget to hold the layout
@@ -166,6 +170,17 @@ class Window(QMainWindow):
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
+  def downloadStockData(self):
+    # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
+    if debug:
+      print("Downloading Stock Data...")
+      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    else:
+      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
+    self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+
   def replaceCurrencySymbols(self, text):
     currency_symbols = {
         "USD": "$",
@@ -200,7 +215,23 @@ class Window(QMainWindow):
     self.tray_icon.show()
 
   def quitApp(self):
-    QCoreApplication.quit()
+    QCoreApplication.quit()   
+
+  def refreshTimeLabel(self):
+    self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
+    if debug:
+      self.refresh_time_label.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
+    else:
+      self.refresh_time_label.setStyleSheet(f"color:{legend_color};")
+    font = QFont()
+    font.setPointSize(update_font_size)
+    self.refresh_time_label.setFont(font)
+    self.refresh_time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+    return self.refresh_time_label
+
+  def updateRefreshTimeLabel(self):
+    self.refresh_time_label.setText(self.update_time)
+    print(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
     title = QLabel(f"{stock.upper()} {self.currency_symbol}{round(self.data['Close'].iloc[-1], 2)}")
@@ -211,13 +242,16 @@ class Window(QMainWindow):
     font = QFont()
     font.setPointSize(title_font_size)
     title.setFont(font)
+    title.setContentsMargins(0, 0, 0, 0)
     return title
 
   def startRefreshTimer(self):
     # Create a QTimer object
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
+    self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
+    self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
     if debug:
       self.refresh_timer.timeout.connect(lambda: print("Refreshing Data"))
     # Start the timer with the specified refresh_interval in milliseconds
@@ -243,7 +277,7 @@ class Window(QMainWindow):
     self.move(frame_geometry.topLeft())
 
   def is_mouse_inside_grip(self, pos):
-    print(pos)
+    # print(pos)
     for grip in self.grips:
       if grip.geometry().contains(pos):
         return True
@@ -251,19 +285,19 @@ class Window(QMainWindow):
 
   if drag_window:
     def mousePressEvent(self, event):
-      print("press")
+      # print("press")
       self.candidate_start_position = event.globalPosition().toPoint()
       # if not self.is_mouse_inside_grip(self.candidate_start_position):
       if not self.is_mouse_inside_grip(event.pos()):
         self.drag_start_position = self.candidate_start_position
 
     def mouseReleaseEvent(self, event):
-      print("release")
+      # print("release")
       if event.button() == 1:  # Left mouse button
         self.drag_start_position = None
 
     def mouseMoveEvent(self, event):
-      print("move")
+      # print("move")
       if self.drag_start_position is not None and not self.is_mouse_inside_grip(self.drag_start_position):
         delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
         self.move(self.x() + delta.x(), self.y() + delta.y())
@@ -317,19 +351,37 @@ class Window(QMainWindow):
     # ax.set_xlabel('Date', color='white', fontsize=10)
     # ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
     # ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
-    ax.set_facecolor('none')
+    if debug:
+      ax.set_facecolor('yellow')
+    else:
+      ax.set_facecolor('none')
     ax.tick_params(which='minor', size=0)
     ax.tick_params(color=legend_color, labelcolor=legend_color)
     ax.tick_params(left = False, bottom = False)
+    ax.tick_params(axis='x', which='major', labelsize=8, pad=0)
+    ax.tick_params(axis='y', which='major', labelsize=8, pad=0)
     # Remove left and right margins
     ax.margins(x=0)
     # Remove graph frame (borders)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+    # ax.spines['top'].set_visible(False)
+    # ax.spines['right'].set_visible(False)
+    # ax.spines['bottom'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    # ax.spines['top'].set_color(legend_color)
+    # ax.spines['right'].set_color(legend_color)
+    # ax.spines['bottom'].set_color(legend_color)
+    # ax.spines['left'].set_color(legend_color)
+    # ax.spines['top'].set_alpha(0.5)
+    # ax.spines['right'].set_alpha(0.5)
+    # ax.spines['bottom'].set_alpha(0.5)
+    # ax.spines['left'].set_alpha(0.5)
+    # Set the color of spines (borders) to white and change their transparency
+    for spine in ax.spines.values():
+      spine.set_color(legend_color)
+      spine.set_alpha(0.5)
+
     # ax.autoscale()
-    self.figure.set_size_inches(5, 2)
+    # self.figure.set_size_inches(4.8, 2)
 
     # Set y-axis limits to avoid the area graph from being pushed up
     ymin = self.data['Close'].min()
@@ -361,23 +413,28 @@ class Window(QMainWindow):
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
     plt.yticks(color=legend_color)  # Set y tick labels text color to white
 
-    # Set the color of spines (borders) to white
-    for spine in ax.spines.values():
-      spine.set_color(legend_color)
-
-    plt.tight_layout()
+    plt.tight_layout(pad=0.1) # 0.1 so that right border is still visible with small window size
+    # plt.autoscale(axis='x')
     # Refresh the canvas to update the plot
     self.canvas.draw()
     if debug:
       print("Done")
 
 if __name__ == '__main__':
+  if debug:
+    print("Starting")
   import sys
   # used to end app with ctrl + c
   import signal
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+  if debug:
+    print("Creating Application...")
   app = QApplication(sys.argv)
+  if debug:
+    print("Done")
   window = Window()
+  if debug:
+    print("Showing Window")
   window.show()
   sys.exit(app.exec())
