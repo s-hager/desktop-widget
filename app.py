@@ -62,7 +62,7 @@ debug = True # set to False for pyinstaller
 # make resizing smoother
 # base amount of y axis tick labels on window size
 
-class Settings(QDialog):
+class Settings(QMainWindow):
   def __init__(self, parent=None):
     super().__init__(parent)
     self.setWindowTitle("Settings")
@@ -73,9 +73,14 @@ class Settings(QDialog):
     layout.addWidget(self.setting_button)
     self.setting_button.clicked.connect(self.show_setting_dialog)
 
-def show_setting_dialog(self):
-  # This method can be used to show another dialog for specific settings
-  print("Settings dialog will open here.")
+  def show_setting_dialog(self):
+    # This method can be used to show another dialog for specific settings
+    print("Settings dialog will open here.")
+  
+  def closeEvent(self, event):
+    # Overriding closeEvent to hide the window instead of closing it
+    self.hide()
+    event.ignore()
 
 class TrayIcon:
   def __init__(self, app):
@@ -89,14 +94,20 @@ class TrayIcon:
     self.quit_action = QAction("Quit", self.app)
     self.enable_startup_action = QAction("Enable Launch on Startup", self.app)
     self.disable_startup_action = QAction("Disable Launch on Startup", self.app)
+    self.open_settings = QAction("Open Settings", self.app)
+
     self.enable_startup_action.setCheckable(True)
     self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
+
+    self.settings_window = Settings()
     self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
     self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
     self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
+    self.open_settings.triggered.connect(lambda: self.settings_window.show())
     self.tray_menu.addAction(self.quit_action)
     self.tray_menu.addAction(self.enable_startup_action)
     self.tray_menu.addAction(self.disable_startup_action)
+    self.tray_menu.addAction(self.open_settings)
 
     # Add the menu to the system tray icon
     self.tray_icon.setContextMenu(self.tray_menu)
