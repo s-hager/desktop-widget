@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QDialog, QPushButton
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QByteArray, QDataStream
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont
 from BlurWindow.blurWindow import GlobalBlur
@@ -61,6 +61,105 @@ debug = True # set to False for pyinstaller
 # remove unnecessary resize event(s) at start
 # make resizing smoother
 # base amount of y axis tick labels on window size
+
+class Settings(QDialog):
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    self.setWindowTitle("Settings")
+    self.setGeometry(100, 100, 300, 200)
+    layout = QVBoxLayout()
+    self.setLayout(layout)
+    self.setting_button = QPushButton("Change Settings")
+    layout.addWidget(self.setting_button)
+    self.setting_button.clicked.connect(self.show_setting_dialog)
+
+def show_setting_dialog(self):
+  # This method can be used to show another dialog for specific settings
+  print("Settings dialog will open here.")
+
+class TrayIcon:
+  def __init__(self, app):
+    self.app = app
+    # Create the system tray icon
+    self.tray_icon = QSystemTrayIcon(self.app)
+    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
+
+    # Create a menu for the system tray icon
+    self.tray_menu = QMenu()
+    self.quit_action = QAction("Quit", self.app)
+    self.enable_startup_action = QAction("Enable Launch on Startup", self.app)
+    self.disable_startup_action = QAction("Disable Launch on Startup", self.app)
+    self.enable_startup_action.setCheckable(True)
+    self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
+    self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
+    self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
+    self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
+    self.tray_menu.addAction(self.quit_action)
+    self.tray_menu.addAction(self.enable_startup_action)
+    self.tray_menu.addAction(self.disable_startup_action)
+
+    # Add the menu to the system tray icon
+    self.tray_icon.setContextMenu(self.tray_menu)
+
+    # Show the system tray icon
+    self.tray_icon.show()
+
+  def enableLaunchOnStartup(self):
+    # https://www.geeksforgeeks.org/autorun-a-python-script-on-windows-startup/
+    app_path = self.exeFilePath()
+    if app_path: # check that app is running as exe
+      try:
+        key = reg.HKEY_CURRENT_USER
+        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+        open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
+        reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
+        reg.CloseKey(open_key)
+        if debug:
+          print(f"Successfully added to startup. Path: {app_path}")
+      except Exception as e: # TODO Handle exception in gui
+        if debug:
+          print(f"Failed to add to startup. Error: {str(e)}")
+    else:
+      # if debug:
+        print("Not running .exe")
+
+  def disableLaunchOnStartup(self):
+    if self.exeFilePath():
+      try:
+        key = reg.HKEY_CURRENT_USER
+        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+        open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
+
+        # Delete the registry value if it exists
+        if reg.QueryValueEx(open_key, app_name):
+          reg.DeleteValue(open_key, app_name)
+          if debug:
+            print("Successfully removed from startup.")
+        else:
+          if debug:
+            print("The registry value does not exist, nothing to remove.")
+
+        reg.CloseKey(open_key)
+      except Exception as e:
+        if debug:
+          print(f"Failed to remove from startup. Error: {str(e)}")
+    else:
+      # if debug:
+        print("Not running .exe")
+
+  def exeFilePath(self):
+    if getattr(sys, 'frozen', False):
+      # Running as an executable (compiled with PyInstaller)
+      return sys.executable # returns "D:\Personal\Privat\Programming\desktop-widget\dist\app.exe"
+    else:
+      # Running as a regular Python script
+      # return sys.argv[0] # returns ".\app.py"
+      return False
+
+  def resource_path(self, relative_path):
+    # Get absolute path to resource, works for dev and for PyInstaller
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -168,9 +267,6 @@ class Window(QMainWindow):
 
     self.startRefreshTimer()
 
-    # Create tray icon
-    self.trayIcon()
-
   # def roundCorners(self):
   #   # Create a QPainterPath with rounded corners
   #   path = QPainterPath()
@@ -222,85 +318,6 @@ class Window(QMainWindow):
     for currency_code, currency_symbol in currency_symbols.items():
         text = text.replace(currency_code, currency_symbol)
     return text
-
-  def resource_path(self, relative_path):
-    # Get absolute path to resource, works for dev and for PyInstaller
-    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
-
-  def trayIcon(self):
-    # Create the system tray icon
-    self.tray_icon = QSystemTrayIcon(self)
-    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
-
-    # Create a menu for the system tray icon
-    self.tray_menu = QMenu()
-    self.quit_action = QAction("Quit", self)
-    self.enable_startup_action = QAction("Enable Launch on Startup", self)
-    self.disable_startup_action = QAction("Disable Launch on Startup", self)
-    self.quit_action.triggered.connect(self.quitApp)
-    self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
-    self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
-    self.tray_menu.addAction(self.quit_action)
-    self.tray_menu.addAction(self.enable_startup_action)
-    self.tray_menu.addAction(self.disable_startup_action)
-
-    # Add the menu to the system tray icon
-    self.tray_icon.setContextMenu(self.tray_menu)
-
-    # Show the system tray icon
-    self.tray_icon.show()
-
-  def quitApp(self):
-    QCoreApplication.quit()   
-
-  def exeFilePath(self):
-    if getattr(sys, 'frozen', False):
-      # Running as an executable (compiled with PyInstaller)
-      return sys.executable # returns "D:\Personal\Privat\Programming\desktop-widget\dist\app.exe"
-    else:
-      # Running as a regular Python script
-      # return sys.argv[0] # returns ".\app.py"
-      return False
-
-  def enableLaunchOnStartup(self):
-    # https://www.geeksforgeeks.org/autorun-a-python-script-on-windows-startup/
-    app_path = self.exeFilePath()
-    if app_path: # check that app is running as exe
-      try:
-        key = reg.HKEY_CURRENT_USER
-        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
-        open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
-        reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
-        reg.CloseKey(open_key)
-        if debug:
-          print(f"Successfully added to startup. Path: {app_path}")
-      except Exception as e: # TODO Handle exception in gui
-        if debug:
-          print(f"Failed to add to startup. Error: {str(e)}")
-    else:
-      # if debug:
-        print("Not running .exe")
-
-  def disableLaunchOnStartup(self):
-    try:
-      key = reg.HKEY_CURRENT_USER
-      key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
-      open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
-
-      # Delete the registry value if it exists
-      if reg.QueryValueEx(open_key, app_name):
-        reg.DeleteValue(open_key, app_name)
-        if debug:
-          print("Successfully removed from startup.")
-      else:
-        if debug:
-          print("The registry value does not exist, nothing to remove.")
-
-      reg.CloseKey(open_key)
-    except Exception as e:
-      if debug:
-        print(f"Failed to remove from startup. Error: {str(e)}")
 
   def refreshTimeLabel(self):
     self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
@@ -498,7 +515,6 @@ class Window(QMainWindow):
       for y_tick_position in y_ticks_positions:
         ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
 
-    print("X LAbels")
     x_labels = range(len(self.data['Datetime']))
     plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
@@ -524,6 +540,10 @@ if __name__ == '__main__':
   if debug:
     print("Creating Application...", end="")
   app = QApplication(sys.argv)
+  if debug:
+    print("Done")
+    print("Creating Tray Icon...", end="")
+  tray_icon = TrayIcon(app)
   if debug:
     print("Done")
   windows = [Window(), Window(), Window()]
