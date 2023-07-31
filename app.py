@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QDialog, QPushButton
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QByteArray, QDataStream
+from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, QTextEdit, QPushButton
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont
 from BlurWindow.blurWindow import GlobalBlur
 import time
@@ -16,7 +16,7 @@ import yfinance as yf
 
 ### -------------------------------- Config -------------------------------- ###
 app_name="StockWidget" # used as name for reg variable for auto startup
-stock = "mu"
+# stock_symbol = "mu"
 legend_color = 'white'
 chart_area_color = 'green'
 chart_line_color = '#4ece6f'
@@ -41,8 +41,8 @@ display_update_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-# debug = False # set to False for pyinstaller
-debug = True # set to False for pyinstaller
+debug = False # set to False for pyinstaller
+# debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -62,59 +62,49 @@ debug = True # set to False for pyinstaller
 # make resizing smoother
 # base amount of y axis tick labels on window size
 
+settings = QSettings("config.ini", QSettings.Format.IniFormat)
+
 class Settings(QMainWindow):
   def __init__(self, parent=None):
     super().__init__(parent)
     self.setWindowTitle("Settings")
     self.setGeometry(100, 100, 300, 200)
     layout = QVBoxLayout()
-    self.setLayout(layout)
-    self.setting_button = QPushButton("Change Settings")
-    layout.addWidget(self.setting_button)
-    self.setting_button.clicked.connect(self.show_setting_dialog)
 
-  def show_setting_dialog(self):
-    # This method can be used to show another dialog for specific settings
-    print("Settings dialog will open here.")
+    self.textbox = QTextEdit(self)
+    self.textbox.setPlaceholderText("Stock Symbol")
+    layout.addWidget(self.textbox)
+    self.button_new_window = QPushButton("Add New Window With This Symbol", self)
+    self.button_new_window.clicked.connect(self.createNewChartWindow)
+    layout.addWidget(self.button_new_window)
+
+    launch_on_startup_stored_value = settings.value("launch_on_startup", False, type=bool)
+
+    self.launch_on_startup_checkbox = QCheckBox("Launch on Startup")
+    self.launch_on_startup_checkbox.setChecked(launch_on_startup_stored_value)
+    self.launch_on_startup_checkbox.clicked.connect(self.launchOnStartupChanged)
+    layout.addWidget(self.launch_on_startup_checkbox)
+
+    central_widget = QWidget()
+    central_widget.setLayout(layout)
+    self.setCentralWidget(central_widget)
+
+  def createNewChartWindow(self):
+    symbol = self.textbox.toPlainText()
+    new_window = ChartWindow(symbol)
+    settings.setValue(f"window_{ChartWindow.window_count}_symbol", symbol)
+    new_window.show()
+    new_window.plotStock()
+
+  def launchOnStartupChanged(self, state):
+    # TODO save state
+    settings.setValue("launch_on_startup", state)
+
+    if state == 2: # Checkbox is checked
+      self.enableLaunchOnStartup()
+    else:
+      self.disableLaunchOnStartup()
   
-  def closeEvent(self, event):
-    # Overriding closeEvent to hide the window instead of closing it
-    self.hide()
-    event.ignore()
-
-class TrayIcon:
-  def __init__(self, app):
-    self.app = app
-    # Create the system tray icon
-    self.tray_icon = QSystemTrayIcon(self.app)
-    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
-
-    # Create a menu for the system tray icon
-    self.tray_menu = QMenu()
-    self.quit_action = QAction("Quit", self.app)
-    self.enable_startup_action = QAction("Enable Launch on Startup", self.app)
-    self.disable_startup_action = QAction("Disable Launch on Startup", self.app)
-    self.open_settings = QAction("Open Settings", self.app)
-
-    self.enable_startup_action.setCheckable(True)
-    self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
-
-    self.settings_window = Settings()
-    self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
-    self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
-    self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
-    self.open_settings.triggered.connect(lambda: self.settings_window.show())
-    self.tray_menu.addAction(self.quit_action)
-    self.tray_menu.addAction(self.enable_startup_action)
-    self.tray_menu.addAction(self.disable_startup_action)
-    self.tray_menu.addAction(self.open_settings)
-
-    # Add the menu to the system tray icon
-    self.tray_icon.setContextMenu(self.tray_menu)
-
-    # Show the system tray icon
-    self.tray_icon.show()
-
   def enableLaunchOnStartup(self):
     # https://www.geeksforgeeks.org/autorun-a-python-script-on-windows-startup/
     app_path = self.exeFilePath()
@@ -167,6 +157,46 @@ class TrayIcon:
       # return sys.argv[0] # returns ".\app.py"
       return False
 
+  def closeEvent(self, event):
+    # Overriding closeEvent to hide the window instead of closing it
+    self.hide()
+    event.ignore()
+
+class TrayIcon:
+  def __init__(self, app):
+    self.app = app
+    # Create the system tray icon
+    self.tray_icon = QSystemTrayIcon(self.app)
+    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
+    self.tray_icon.setToolTip(app_name)
+    # self.tray_icon.setStyleSheet("QSystemTrayIcon {background-color: #333333; color: #FFFFFF;}")
+
+    # Create a menu for the system tray icon
+    self.tray_menu = QMenu()
+    self.open_settings = QAction("Open Settings", self.app)
+    self.quit_action = QAction("Quit", self.app)
+    # self.enable_startup_action = QAction("Enable Launch on Startup", self.app)
+    # self.disable_startup_action = QAction("Disable Launch on Startup", self.app)
+
+    # self.enable_startup_action.setCheckable(True)
+    # self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
+
+    self.settings_window = Settings()
+    self.open_settings.triggered.connect(lambda: self.settings_window.show())
+    self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
+    # self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
+    # self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
+    self.tray_menu.addAction(self.open_settings)
+    self.tray_menu.addAction(self.quit_action)
+    # self.tray_menu.addAction(self.enable_startup_action)
+    # self.tray_menu.addAction(self.disable_startup_action)
+
+    # Add the menu to the system tray icon
+    self.tray_icon.setContextMenu(self.tray_menu)
+
+    # Show the system tray icon
+    self.tray_icon.show()
+
   def resource_path(self, relative_path):
     # Get absolute path to resource, works for dev and for PyInstaller
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -185,15 +215,16 @@ class CustomFormatter(Formatter):
       return ''
     return self.dates[index].strftime(self.format)
 
-class Window(QMainWindow):
+class ChartWindow(QMainWindow):
   window_count = 0
-  def __init__(self):
-    super(Window, self).__init__(parent=None)
-    Window.window_count += 1
+  def __init__(self, stock_symbol):
+    super(ChartWindow, self).__init__(parent=None)
+    self.stock_symbol = stock_symbol
+    ChartWindow.window_count += 1
     self.drag_start_position = None
     if debug:
-      print(f"Start Creating Window {Window.window_count}")
-    self.window_id = f"window_{Window.window_count}"
+      print(f"Start Creating Window {ChartWindow.window_count}")
+    self.window_id = f"window_{ChartWindow.window_count}"
     # Call move with an invalid position to prevent default positioning
     # self.move(-1000, -1000)
 
@@ -205,7 +236,6 @@ class Window(QMainWindow):
     # self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
 
     # Load settings from config file and move window
-    settings = QSettings("config.ini", QSettings.Format.IniFormat)
     pos = settings.value(f"{self.window_id}_pos", QPoint(QGuiApplication.primaryScreen().availableGeometry().center()), type=QPoint)
     size = settings.value(f"{self.window_id}_size", QSize(size_relative_to_screen), type=QSize)
     self.move(pos)
@@ -225,6 +255,7 @@ class Window(QMainWindow):
       self.figure = plt.figure(facecolor='blue')
     else:
       self.figure = plt.figure()
+    # self.figure.tight_layout(pad=0.1)
     self.canvas = FigureCanvas(self.figure)
     self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     self.figure.patch.set_alpha(0)
@@ -233,7 +264,7 @@ class Window(QMainWindow):
     self.downloadStockData()
 
     # Get stock currency
-    self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(stock).info["currency"])
+    self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
 
     # Add the title bar and canvas to a vertical layout
 
@@ -301,10 +332,6 @@ class Window(QMainWindow):
     super().moveEvent(event)
 
   def savePositionAndSize(self):
-    settings = QSettings("config.ini", QSettings.Format.IniFormat)
-    # pos_data = QByteArray()
-    # stream = QDataStream(pos_data, QDataStream.WriteOnly)
-    # stream << self.pos() # globalPosition()
     settings.setValue(f"{self.window_id}_pos", self.pos())
     settings.setValue(f"{self.window_id}_size", self.size())
 
@@ -312,9 +339,9 @@ class Window(QMainWindow):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
     if debug:
       print("Downloading Stock Data...")
-      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+      self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     else:
-      self.data = yf.download(stock, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+      self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
     self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
@@ -349,10 +376,10 @@ class Window(QMainWindow):
 
   def titleWidget(self):
     if debug:
-      title = QLabel(f"{stock.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
+      title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
       title.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
     else:
-      title = QLabel(f"{stock.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
+      title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
       title.setStyleSheet(f"color:{legend_color};")
     font = QFont()
     font.setPointSize(title_font_size)
@@ -462,6 +489,7 @@ class Window(QMainWindow):
     ax.xaxis.set_major_formatter(formatter)
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(self.format_y_tick_label))
     self.data['Close'].plot(ax=ax, color=chart_line_color)
+    self.figure.set_tight_layout({'pad': 0.1}) # TODO 0.1 otherwise right border is not visible
 
     # Fill the area below the stock price line with a color
     if area_chart:
@@ -527,13 +555,13 @@ class Window(QMainWindow):
         ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
 
     x_labels = range(len(self.data['Datetime']))
-    plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
-    plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
+    ax.set_xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
+    ax.xaxis.set_minor_locator(FixedLocator(x_labels))
     # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
     # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
-    plt.yticks(color=legend_color)  # Set y tick labels text color to white
+    ax.yaxis.set_tick_params(color=legend_color)  # Set y tick labels text color to white
 
-    plt.tight_layout(pad=0.1) # TODO 0.1 otherwise right border is not visible
+    # plt.tight_layout(pad=0.1) # TODO 0.1 otherwise right border is not visible
     # plt.autoscale(axis='x')
     # Refresh the canvas to update the plot
     self.canvas.draw()
@@ -557,12 +585,16 @@ if __name__ == '__main__':
   tray_icon = TrayIcon(app)
   if debug:
     print("Done")
-  windows = [Window(), Window(), Window()]
-  for i, window in enumerate(windows):
-    if debug:
-      print(f"Showing Window {i + 1}")
-    window.show()
-    window.plotStock()
+  # windows = [ChartWindow(), ChartWindow(), ChartWindow()]
+  keys = settings.allKeys()
+  for i, key in enumerate(keys):
+    if key.startswith("window_") and key.endswith("_symbol"):
+      window_symbol = settings.value(key)
+      window = ChartWindow(window_symbol)
+      if debug:
+        print(f"Showing Window {i + 1}")
+      window.show()
+      window.plotStock()
   if debug:
     print("Done")
   sys.exit(app.exec())
