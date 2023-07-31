@@ -16,7 +16,8 @@ import pandas as pd
 import yfinance as yf
 
 ### -------------------------------- Config -------------------------------- ###
-stock = "mu" # temp
+app_name="StockWidget" # used as name for reg variable for auto startup
+stock = "mu"
 legend_color = 'white'
 chart_area_color = 'green'
 chart_line_color = '#4ece6f'
@@ -211,11 +212,14 @@ class Window(QMainWindow):
     # Create a menu for the system tray icon
     self.tray_menu = QMenu()
     self.quit_action = QAction("Quit", self)
-    self.startup_action = QAction("Enable Launch on Startup", self)
+    self.enable_startup_action = QAction("Enable Launch on Startup", self)
+    self.disable_startup_action = QAction("Disable Launch on Startup", self)
     self.quit_action.triggered.connect(self.quitApp)
-    self.startup_action.triggered.connect(self.startup)
+    self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
+    self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
     self.tray_menu.addAction(self.quit_action)
-    self.tray_menu.addAction(self.startup_action)
+    self.tray_menu.addAction(self.enable_startup_action)
+    self.tray_menu.addAction(self.disable_startup_action)
 
     # Add the menu to the system tray icon
     self.tray_icon.setContextMenu(self.tray_menu)
@@ -226,21 +230,53 @@ class Window(QMainWindow):
   def quitApp(self):
     QCoreApplication.quit()   
 
-  def startup(self):
-    app_name="StockWidget"
-    app_path=os.path.abspath(r"D:\Personal\Privat\Programming\desktop-widget\dist\app.exe")
-    value_name = app_name
-    value_data = app_path
-    print("Work in Progress")
-    # try:
-    #     key = reg.HKEY_CURRENT_USER
-    #     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    #     reg.CreateKey(key, key_path)
-    #     print(value_name)
-    #     reg.SetValueEx(key, value_name, 0, reg.REG_SZ, value_data)
-    #     print("Successfully added to startup.")
-    # except Exception as e:
-    #     print(f"Failed to add to startup. Error: {str(e)}")
+  def exeFilePath(self):
+    if getattr(sys, 'frozen', False):
+      # Running as an executable (compiled with PyInstaller)
+      return sys.executable # returns "D:\Personal\Privat\Programming\desktop-widget\dist\app.exe"
+    else:
+      # Running as a regular Python script
+      # return sys.argv[0] # returns ".\app.py"
+      return False
+
+  def enableLaunchOnStartup(self):
+    # https://www.geeksforgeeks.org/autorun-a-python-script-on-windows-startup/
+    app_path = self.exeFilePath()
+    if app_path: # check that app is running as exe
+      try:
+        key = reg.HKEY_CURRENT_USER
+        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+        open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
+        reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
+        reg.CloseKey(open_key)
+        if debug:
+          print(f"Successfully added to startup. Path: {app_path}")
+      except Exception as e: # TODO Handle exception in gui
+        if debug:
+          print(f"Failed to add to startup. Error: {str(e)}")
+    else:
+      # if debug:
+        print("Not running .exe")
+
+  def disableLaunchOnStartup(self):
+    try:
+      key = reg.HKEY_CURRENT_USER
+      key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+      open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
+
+      # Delete the registry value if it exists
+      if reg.QueryValueEx(open_key, app_name):
+        reg.DeleteValue(open_key, app_name)
+        if debug:
+          print("Successfully removed from startup.")
+      else:
+        if debug:
+          print("The registry value does not exist, nothing to remove.")
+
+      reg.CloseKey(open_key)
+    except Exception as e:
+      if debug:
+        print(f"Failed to remove from startup. Error: {str(e)}")
 
   def refreshTimeLabel(self):
     self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
