@@ -1,7 +1,6 @@
-from PyQt6 import QtGui
 from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QObject, QEvent, QRectF
-from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QPainter, QRegion, QPainterPath
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QByteArray, QDataStream
+from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
@@ -36,14 +35,14 @@ padding_multiplier = 0.5
 y_label_every_x_datapoints = 100
 title_font_size = 20
 update_font_size = 8
-center_window = True
+center_window = False
 drag_window = True
 display_update_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-debug = False # set to False for pyinstaller
-# debug = True # set to False for pyinstaller
+# debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -77,12 +76,31 @@ class CustomFormatter(Formatter):
     return self.dates[index].strftime(self.format)
 
 class Window(QMainWindow):
+  window_count = 0
   def __init__(self):
     super(Window, self).__init__(parent=None)
+    Window.window_count += 1
     self.drag_start_position = None
     if debug:
-      print("Start Creating Window")
-    self.setWindowTitle("no title")
+      print(f"Start Creating Window {Window.window_count}")
+    self.window_id = f"window_{Window.window_count}"
+    # Call move with an invalid position to prevent default positioning
+    # self.move(-1000, -1000)
+
+    # Set the window's size to a fraction of the screen's size
+    screen_size = QApplication.primaryScreen().size()  # Get the screen's size
+    fraction_of_screen = 0.2  # Set the fraction of the screen size you want the window to occupy
+    size_relative_to_screen = QSize(int(screen_size.width() * fraction_of_screen),
+                                    int(screen_size.height() * fraction_of_screen))
+    # self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
+
+    # Load settings from config file and move window
+    settings = QSettings("config.ini", QSettings.Format.IniFormat)
+    pos = settings.value(f"{self.window_id}_pos", QPoint(QGuiApplication.primaryScreen().availableGeometry().center()), type=QPoint)
+    size = settings.value(f"{self.window_id}_size", QSize(size_relative_to_screen), type=QSize)
+    self.move(pos)
+    self.resize(size)
+    self.setWindowTitle(f"{self.window_id}")
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
     if debug:
@@ -92,13 +110,6 @@ class Window(QMainWindow):
       print("Done")
     # self.roundCorners() # TODO
 
-    # Set the window's size to a fraction of the screen's size
-    screen_size = QApplication.primaryScreen().size()  # Get the screen's size
-    fraction_of_screen = 0.2  # Set the fraction of the screen size you want the window to occupy
-    size_relative_to_screen = QSize(int(screen_size.width() * fraction_of_screen),
-                                    int(screen_size.height() * fraction_of_screen))
-    self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
-    
     # Create a Figure and Canvas for Matplotlib plot
     if debug:
       self.figure = plt.figure(facecolor='blue')
@@ -176,6 +187,19 @@ class Window(QMainWindow):
 
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
+
+  def moveEvent(self, event):
+    # This method is called when the window is moved
+    self.savePositionAndSize()
+    super().moveEvent(event)
+
+  def savePositionAndSize(self):
+    settings = QSettings("config.ini", QSettings.Format.IniFormat)
+    # pos_data = QByteArray()
+    # stream = QDataStream(pos_data, QDataStream.WriteOnly)
+    # stream << self.pos() # globalPosition()
+    settings.setValue(f"{self.window_id}_pos", self.pos())
+    settings.setValue(f"{self.window_id}_size", self.size())
 
   def downloadStockData(self):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
@@ -296,10 +320,11 @@ class Window(QMainWindow):
       print(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
-    title = QLabel(f"{stock.upper()} {self.currency_symbol}{round(self.data['Close'].iloc[-1], 2)}")
     if debug:
+      title = QLabel(f"{stock.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
       title.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
     else:
+      title = QLabel(f"{stock.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
       title.setStyleSheet(f"color:{legend_color};")
     font = QFont()
     font.setPointSize(title_font_size)
@@ -322,6 +347,7 @@ class Window(QMainWindow):
     self.refresh_timer.start(refresh_interval * 1000)
 
   def resizeEvent(self, event):
+    self.plotStock() # replot stock to adjust to new window size
     if debug:
       print("Resize Event")
     QMainWindow.resizeEvent(self, event)
@@ -334,7 +360,6 @@ class Window(QMainWindow):
         rect.right() - self.gripSize, rect.bottom() - self.gripSize)
     # bottom left
     self.grips[3].move(0, rect.bottom() - self.gripSize)
-    self.plotStock() # replot stock to adjust to new window size
     # time.sleep(0.01)
 
   def centerWindow(self):
@@ -473,6 +498,7 @@ class Window(QMainWindow):
       for y_tick_position in y_ticks_positions:
         ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
 
+    print("X LAbels")
     x_labels = range(len(self.data['Datetime']))
     plt.xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
     plt.gca().xaxis.set_minor_locator(FixedLocator(x_labels))
@@ -500,9 +526,12 @@ if __name__ == '__main__':
   app = QApplication(sys.argv)
   if debug:
     print("Done")
-  window = Window()
+  windows = [Window(), Window(), Window()]
+  for i, window in enumerate(windows):
+    if debug:
+      print(f"Showing Window {i + 1}")
+    window.show()
+    window.plotStock()
   if debug:
-    print("Showing Window")
-  window.show()
-  window.plotStock()
+    print("Done")
   sys.exit(app.exec())

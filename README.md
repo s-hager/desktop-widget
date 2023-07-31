@@ -14,4 +14,8 @@ pyinstaller app.py --onefile --paths=./venv/lib/site-packages --add-data "icon.i
 pyinstaller app.spec
 
 ### Auto Launch on System Start
-Autostart adds windows registry key to Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run if running as .exe
+Autostart adds windows registry key to 
+
+```Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run```
+
+if running as .exe
