@@ -1,9 +1,12 @@
-from PyQt6.QtWidgets import QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, QTextEdit, QPushButton
+from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
+                             QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
+                             QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
+import re
 import winreg as reg
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -65,36 +68,109 @@ debug = False # set to False for pyinstaller
 settings = QSettings("config.ini", QSettings.Format.IniFormat)
 
 class Settings(QMainWindow):
-  def __init__(self, parent=None):
+  def __init__(self, windows, parent=None):
     super().__init__(parent)
+    self.windows = windows
     self.setWindowTitle("Settings")
     self.setGeometry(100, 100, 300, 200)
-    layout = QVBoxLayout()
+    self.layout = QVBoxLayout()
 
-    self.textbox = QTextEdit(self)
+    new_stock_layout = QHBoxLayout()
+    self.textbox = QLineEdit(self)
     self.textbox.setPlaceholderText("Stock Symbol")
-    layout.addWidget(self.textbox)
-    self.button_new_window = QPushButton("Add New Window With This Symbol", self)
+    new_stock_layout.addWidget(self.textbox)
+    self.button_new_window = QPushButton("Add New Window", self)
     self.button_new_window.clicked.connect(self.createNewChartWindow)
-    layout.addWidget(self.button_new_window)
+    new_stock_layout.addWidget(self.button_new_window)
+    self.layout.addLayout(new_stock_layout)
 
     launch_on_startup_stored_value = settings.value("launch_on_startup", False, type=bool)
 
-    self.launch_on_startup_checkbox = QCheckBox("Launch on Startup")
+    self.launch_on_startup_checkbox = QCheckBox("Launch Application on Startup")
     self.launch_on_startup_checkbox.setChecked(launch_on_startup_stored_value)
     self.launch_on_startup_checkbox.clicked.connect(self.launchOnStartupChanged)
-    layout.addWidget(self.launch_on_startup_checkbox)
+    self.layout.addWidget(self.launch_on_startup_checkbox)
+
+    self.addOpenWindows()
 
     central_widget = QWidget()
-    central_widget.setLayout(layout)
+    central_widget.setLayout(self.layout)
     self.setCentralWidget(central_widget)
 
+  def clearLayout(self, layout):
+    if layout is not None:
+      while layout.count():
+        item = layout.takeAt(0)
+        widget = item.widget()
+        if widget:
+          widget.deleteLater()
+        else:
+          self.clearLayout(item.layout())
+
+  def addOpenWindows(self):
+    # self.clearLayout(self.window_layout)
+    for window in self.windows:
+      # Create a QHBoxLayout for each window label and button
+      window_layout = QHBoxLayout()
+
+      # Add the label containing the stock symbol to the layout
+      label = QLabel(window.stock_symbol)
+      window_layout.addWidget(label)
+
+      # Add a button next to the label
+      settings_button = QPushButton(f"{window.stock_symbol} Settings")
+      delete_button = QPushButton(f"Delete {window.stock_symbol}")
+      
+      # settings_button.clicked.connect(self.onButtonClick)
+      # Attach the window object to the delete button for later access
+      delete_button.window = window
+      delete_button.clicked.connect(self.deleteChartWindow)
+
+      window_layout.addWidget(settings_button)
+      window_layout.addWidget(delete_button)
+
+      # Add the QHBoxLayout for this window to the main QVBoxLayout
+      self.layout.addLayout(window_layout)
+
+  def deleteChartWindow(self):
+    window = self.sender().window
+    all_keys = settings.allKeys()
+    # print(all_keys)
+    for key in all_keys:
+      if key.startswith(window.window_id):
+        settings.remove(key)
+        if debug:
+          print(f"Removed {window.window_id} from config")
+        window.close()
+        if debug:
+          print("Closed window")
+    
+    # previous_old_id = None
+    # previous_new_id = None
+    # for i, key in enumerate(settings.allKeys()):
+    #   if key.startswith(f"window_"):
+    #     # print(key)
+    #     # print(int(re.findall(r"^window_(\d+)_[^_]+$", key)[0]))
+    #     value_variable = str(re.findall(r"^window_\d+_(.*)$", key)[0])
+    #     key_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
+    #     if not previous_old_id:
+    #       previous_old_id = key_id
+    #       previous_new_id = i
+    #       settings.setValue(f"window_{i}_{value_variable}", settings.value)
+    #     if previous_old_id == key_id:
+    #       settings.setValue(f"window_{previous_new_id}_{value_variable}", settings.value)
+
   def createNewChartWindow(self):
-    symbol = self.textbox.toPlainText()
-    new_window = ChartWindow(symbol)
-    settings.setValue(f"window_{ChartWindow.window_count}_symbol", symbol)
-    new_window.show()
-    new_window.plotStock()
+    # self.clearLayout(self.window_layout)
+    # self.addOpenWindows()
+    stock_symbol = self.textbox.text().strip()
+    if not stock_symbol:
+      QMessageBox.critical(self, "Error", "Stock Symbol cannot be empty.")
+    else:
+      new_window = ChartWindow(stock_symbol)
+      settings.setValue(f"window_{ChartWindow.window_count}_symbol", stock_symbol)
+      new_window.show()
+      new_window.plotStock()
 
   def launchOnStartupChanged(self, state):
     # TODO save state
@@ -163,11 +239,12 @@ class Settings(QMainWindow):
     event.ignore()
 
 class TrayIcon:
-  def __init__(self, app):
+  def __init__(self, app, windows):
     self.app = app
+    self.windows = windows
     # Create the system tray icon
     self.tray_icon = QSystemTrayIcon(self.app)
-    self.tray_icon.setIcon(QIcon(self.resource_path("icon.ico")))
+    self.tray_icon.setIcon(QIcon(self.resourcePath("icon.ico")))
     self.tray_icon.setToolTip(app_name)
     # self.tray_icon.setStyleSheet("QSystemTrayIcon {background-color: #333333; color: #FFFFFF;}")
 
@@ -181,8 +258,7 @@ class TrayIcon:
     # self.enable_startup_action.setCheckable(True)
     # self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
 
-    self.settings_window = Settings()
-    self.open_settings.triggered.connect(lambda: self.settings_window.show())
+    self.open_settings.triggered.connect(self.showSettingsWindow)
     self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
     # self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
     # self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
@@ -196,8 +272,12 @@ class TrayIcon:
 
     # Show the system tray icon
     self.tray_icon.show()
+      
+  def showSettingsWindow(self):
+      self.settings_window = Settings(self.windows)
+      self.settings_window.show()
 
-  def resource_path(self, relative_path):
+  def resourcePath(self, relative_path):
     # Get absolute path to resource, works for dev and for PyInstaller
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
@@ -217,14 +297,17 @@ class CustomFormatter(Formatter):
 
 class ChartWindow(QMainWindow):
   window_count = 0
-  def __init__(self, stock_symbol):
+  def __init__(self, stock_symbol, window_id=None):
     super(ChartWindow, self).__init__(parent=None)
     self.stock_symbol = stock_symbol
     ChartWindow.window_count += 1
     self.drag_start_position = None
     if debug:
       print(f"Start Creating Window {ChartWindow.window_count}")
-    self.window_id = f"window_{ChartWindow.window_count}"
+    if window_id:
+      self.window_id = f"window_{window_id}"
+    else:
+      self.window_id = f"window_{ChartWindow.window_count}"
     # Call move with an invalid position to prevent default positioning
     # self.move(-1000, -1000)
 
@@ -581,20 +664,23 @@ if __name__ == '__main__':
   app = QApplication(sys.argv)
   if debug:
     print("Done")
-    print("Creating Tray Icon...", end="")
-  tray_icon = TrayIcon(app)
-  if debug:
-    print("Done")
   # windows = [ChartWindow(), ChartWindow(), ChartWindow()]
-  keys = settings.allKeys()
-  for i, key in enumerate(keys):
+  windows = []
+  all_keys = settings.allKeys()
+  for i, key in enumerate(all_keys):
     if key.startswith("window_") and key.endswith("_symbol"):
       window_symbol = settings.value(key)
-      window = ChartWindow(window_symbol)
+      window_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
+      window = ChartWindow(window_symbol, window_id)
       if debug:
-        print(f"Showing Window {i + 1}")
+        print(f"Showing Window {window_id}")
       window.show()
       window.plotStock()
+      windows.append(window)
+  if debug:
+    print("Done")
+    print("Creating Tray Icon...", end="")
+  tray_icon = TrayIcon(app, windows)
   if debug:
     print("Done")
   sys.exit(app.exec())
