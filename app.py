@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+import functools
+
 ### -------------------------------- Config -------------------------------- ###
 app_name="StockWidget" # used as name for reg variable for auto startup
 # stock_symbol = "mu"
@@ -40,11 +42,11 @@ title_font_size = 20
 update_font_size = 8
 center_window = False
 drag_window = True
-display_update_time = True
+display_refresh_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
 # debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
@@ -65,7 +67,9 @@ debug = False # set to False for pyinstaller
 # make resizing smoother
 # base amount of y axis tick labels on window size
 
+# Global Constants
 settings = QSettings("config.ini", QSettings.Format.IniFormat)
+window_id_counter = 0
 
 class Settings(QMainWindow):
   def __init__(self, windows, parent=None):
@@ -77,16 +81,19 @@ class Settings(QMainWindow):
 
     new_stock_layout = QHBoxLayout()
     self.textbox = QLineEdit(self)
-    self.textbox.setPlaceholderText("Stock Symbol")
-    new_stock_layout.addWidget(self.textbox)
     self.button_new_window = QPushButton("Add New Window", self)
+    self.launch_on_startup_checkbox = QCheckBox("Launch Application on Startup")
+
+    self.textbox.setPlaceholderText("Stock Symbol")
+    self.textbox.returnPressed.connect(lambda: self.button_new_window.click())
+    new_stock_layout.addWidget(self.textbox)
+    
     self.button_new_window.clicked.connect(self.createNewChartWindow)
     new_stock_layout.addWidget(self.button_new_window)
     self.layout.addLayout(new_stock_layout)
 
     launch_on_startup_stored_value = settings.value("launch_on_startup", False, type=bool)
 
-    self.launch_on_startup_checkbox = QCheckBox("Launch Application on Startup")
     self.launch_on_startup_checkbox.setChecked(launch_on_startup_stored_value)
     self.launch_on_startup_checkbox.clicked.connect(self.launchOnStartupChanged)
     self.layout.addWidget(self.launch_on_startup_checkbox)
@@ -97,53 +104,11 @@ class Settings(QMainWindow):
     central_widget.setLayout(self.layout)
     self.setCentralWidget(central_widget)
 
-  def clearLayout(self, layout):
-    if layout is not None:
-      while layout.count():
-        item = layout.takeAt(0)
-        widget = item.widget()
-        if widget:
-          widget.deleteLater()
-        else:
-          self.clearLayout(item.layout())
-
   def addOpenWindows(self):
     # self.clearLayout(self.window_layout)
     for window in self.windows:
-      # Create a QHBoxLayout for each window label and button
-      window_layout = QHBoxLayout()
-
-      # Add the label containing the stock symbol to the layout
-      label = QLabel(window.stock_symbol)
-      window_layout.addWidget(label)
-
-      # Add a button next to the label
-      settings_button = QPushButton(f"{window.stock_symbol} Settings")
-      delete_button = QPushButton(f"Delete {window.stock_symbol}")
-      
-      # settings_button.clicked.connect(self.onButtonClick)
-      # Attach the window object to the delete button for later access
-      delete_button.window = window
-      delete_button.clicked.connect(self.deleteChartWindow)
-
-      window_layout.addWidget(settings_button)
-      window_layout.addWidget(delete_button)
-
       # Add the QHBoxLayout for this window to the main QVBoxLayout
-      self.layout.addLayout(window_layout)
-
-  def deleteChartWindow(self):
-    window = self.sender().window
-    all_keys = settings.allKeys()
-    # print(all_keys)
-    for key in all_keys:
-      if key.startswith(window.window_id):
-        settings.remove(key)
-        if debug:
-          print(f"Removed {window.window_id} from config")
-        window.close()
-        if debug:
-          print("Closed window")
+      self.layout.addLayout(self.SettingsStockLayout(window).getLayout())
     
     # previous_old_id = None
     # previous_new_id = None
@@ -161,16 +126,69 @@ class Settings(QMainWindow):
     #       settings.setValue(f"window_{previous_new_id}_{value_variable}", settings.value)
 
   def createNewChartWindow(self):
+    global window_id_counter
     # self.clearLayout(self.window_layout)
     # self.addOpenWindows()
-    stock_symbol = self.textbox.text().strip()
+    stock_symbol = self.textbox.text().strip().upper()
     if not stock_symbol:
       QMessageBox.critical(self, "Error", "Stock Symbol cannot be empty.")
     else:
+      self.textbox.clear() # clear user input from textbox
+      window_id_counter += 1
+      window_id = window_id_counter
       new_window = ChartWindow(stock_symbol)
-      settings.setValue(f"window_{ChartWindow.window_count}_symbol", stock_symbol)
+      settings.setValue(f"window_{window_id}_symbol", stock_symbol)
       new_window.show()
       new_window.plotStock()
+      self.layout.addLayout(self.SettingsStockLayout(new_window).getLayout())
+
+  class SettingsStockLayout(QHBoxLayout):
+    def __init__(self, window, parent=None):
+      super().__init__(parent)
+      self.window = window
+      self.window_id = window.window_id
+      self.stock_symbol = window.stock_symbol
+
+      # Create a QHBoxLayout for each window label and button
+      self.window_layout = QHBoxLayout()
+      
+      # Add the label containing the stock symbol to the layout
+      label = QLabel(self.stock_symbol)
+      self.window_layout.addWidget(label)
+
+      # Add a button next to the label
+      if debug:
+        settings_button = QPushButton(f"{self.stock_symbol} Settings id:{self.window_id}")
+        delete_button = QPushButton(f"Delete {self.stock_symbol} id:{self.window_id}")
+      else:
+        settings_button = QPushButton(f"{self.stock_symbol} Settings")
+        delete_button = QPushButton(f"Delete {self.stock_symbol}")
+      
+      # settings_button.clicked.connect(self.test)
+
+      # Attach the window object to the delete button for later access
+      delete_button.window = self.window
+      delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
+
+      self.window_layout.addWidget(settings_button)
+      self.window_layout.addWidget(delete_button)
+
+    def getLayout(self):
+      return self.window_layout
+
+    def deleteChartWindow(self):
+      if debug:
+        print(window.stock_symbol)
+      all_keys = settings.allKeys()
+      # print(all_keys)
+      for key in all_keys:
+        if key.startswith(self.window_id):
+          settings.remove(key)
+          if debug:
+            print(f"Removed {self.window_id} from config")
+          window.close()
+          if debug:
+            print("Closed window")
 
   def launchOnStartupChanged(self, state):
     # TODO save state
@@ -296,18 +314,17 @@ class CustomFormatter(Formatter):
     return self.dates[index].strftime(self.format)
 
 class ChartWindow(QMainWindow):
-  window_count = 0
   def __init__(self, stock_symbol, window_id=None):
     super(ChartWindow, self).__init__(parent=None)
     self.stock_symbol = stock_symbol
-    ChartWindow.window_count += 1
     self.drag_start_position = None
+    window_id = window_id_counter
     if debug:
-      print(f"Start Creating Window {ChartWindow.window_count}")
+      print(f"Start Creating Window {window_id}")
     if window_id:
       self.window_id = f"window_{window_id}"
     else:
-      self.window_id = f"window_{ChartWindow.window_count}"
+      self.window_id = f"window_{window_id}"
     # Call move with an invalid position to prevent default positioning
     # self.move(-1000, -1000)
 
@@ -361,7 +378,7 @@ class ChartWindow(QMainWindow):
     layout = QVBoxLayout()
     layout.addWidget(self.title_widget)
     layout.addWidget(self.canvas)
-    if display_update_time:
+    if display_refresh_time:
       layout.addWidget(self.refreshTimeLabel())
     layout.setSpacing(0)
     layout.setContentsMargins(*window_margins)
@@ -671,6 +688,8 @@ if __name__ == '__main__':
     if key.startswith("window_") and key.endswith("_symbol"):
       window_symbol = settings.value(key)
       window_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
+      if window_id > window_id_counter:
+        window_id_counter = window_id
       window = ChartWindow(window_symbol, window_id)
       if debug:
         print(f"Showing Window {window_id}")
