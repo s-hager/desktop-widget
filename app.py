@@ -140,6 +140,7 @@ class Settings(QMainWindow):
       settings.setValue(f"window_{window_id}_symbol", stock_symbol)
       new_window.show()
       new_window.plotStock()
+      windows.append(new_window)
       self.layout.addLayout(self.SettingsStockLayout(new_window).getLayout())
 
   class SettingsStockLayout(QHBoxLayout):
@@ -167,7 +168,6 @@ class Settings(QMainWindow):
       # settings_button.clicked.connect(self.test)
 
       # Attach the window object to the delete button for later access
-      delete_button.window = self.window
       delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
 
       self.window_layout.addWidget(settings_button)
@@ -178,17 +178,36 @@ class Settings(QMainWindow):
 
     def deleteChartWindow(self):
       if debug:
-        print(window.stock_symbol)
+        print(f"Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
       all_keys = settings.allKeys()
       # print(all_keys)
       for key in all_keys:
         if key.startswith(self.window_id):
+          if debug:
+            print(f"Removing {key} with value {settings.value(key)} from config")
           settings.remove(key)
-          if debug:
-            print(f"Removed {self.window_id} from config")
-          window.close()
-          if debug:
-            print("Closed window")
+      self.window.close()
+      if debug:
+        print("Closed window")
+      # remove layout from settings window
+      self.deleteLayout()
+      # for i in reversed(range(self.window_layout.count())):
+      #   item = self.window_layout.itemAt(i)
+      #   print(item)
+      #   if item.layout() and item.layout().widget() and hasattr(item.layout().widget(), "window_id"):
+      #     if item.layout().widget().window_id == self.window_id:
+      #       self.window_layout.removeItem(item)
+
+    def deleteLayout(self):
+      # Remove all widgets from the layout
+      while self.window_layout.count():
+        item = self.window_layout.takeAt(0)
+        widget = item.widget()
+        if widget:
+          widget.deleteLater()
+
+      # Delete the layout itself
+      self.window_layout.deleteLater()
 
   def launchOnStartupChanged(self, state):
     # TODO save state
@@ -320,7 +339,7 @@ class ChartWindow(QMainWindow):
     self.drag_start_position = None
     window_id = window_id_counter
     if debug:
-      print(f"Start Creating Window {window_id}")
+      print(f"Start Creating Window with id {window_id}")
     if window_id:
       self.window_id = f"window_{window_id}"
     else:
@@ -692,7 +711,7 @@ if __name__ == '__main__':
         window_id_counter = window_id
       window = ChartWindow(window_symbol, window_id)
       if debug:
-        print(f"Showing Window {window_id}")
+        print(f"Showing Window with id {window_id}")
       window.show()
       window.plotStock()
       windows.append(window)
