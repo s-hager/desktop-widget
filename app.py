@@ -41,7 +41,7 @@ y_label_every_x_datapoints = 100
 title_font_size = 20
 update_font_size = 8
 center_window = False
-drag_window = True
+drag_window = False
 display_refresh_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
@@ -66,6 +66,7 @@ debug = True # set to False for pyinstaller
 # remove unnecessary resize event(s) at start
 # make resizing smoother
 # base amount of y axis tick labels on window size
+# use createNewChartWindow also at startup
 
 # Global Constants
 settings = QSettings("config.ini", QSettings.Format.IniFormat)
@@ -164,10 +165,10 @@ class Settings(QMainWindow):
       label = QLabel(self.stock_symbol)
       self.window_layout.addWidget(label)
 
-      lock_button = QPushButton()
-      lock_button.setIcon(QIcon('locked.png'))
-      lock_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-      # self.lock_button.clicked.connect(self.toggleIcon)
+      self.lock_button = QPushButton()
+      self.lock_button.setIcon(QIcon('locked.png'))
+      self.lock_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+      self.lock_button.clicked.connect(self.toggleLock)
       # Add a button next to the label
       if debug:
         settings_button = QPushButton(f"{self.stock_symbol} Settings id:{self.window_id}")
@@ -179,9 +180,17 @@ class Settings(QMainWindow):
 
       # Attach the window object to the delete button for later access
       delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
-      self.window_layout.addWidget(lock_button)
+      self.window_layout.addWidget(self.lock_button)
       self.window_layout.addWidget(settings_button)
       self.window_layout.addWidget(delete_button)
+
+    def toggleLock(self):
+      self.window.drag_resize = not self.window.drag_resize
+      settings.setValue(f"{self.window_id}_drag_resize", self.window.drag_resize)
+      if self.window.drag_resize:
+        self.lock_button.setIcon(QIcon('unlocked.png'))
+      else:
+        self.lock_button.setIcon(QIcon('locked.png'))
 
     def getLayout(self):
       return self.window_layout
@@ -304,6 +313,10 @@ class TrayIcon:
 
     # self.enable_startup_action.setCheckable(True)
     # self.enable_startup_action.setChecked(True) # TODO merge actions into 1 that is either checked or unchecked
+
+    # show settings if no windows in config
+    if not windows:
+      self.showSettingsWindow()
 
     self.open_settings.triggered.connect(self.showSettingsWindow)
     self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
@@ -433,15 +446,24 @@ class ChartWindow(QMainWindow):
       # Center the window on the screen
       self.centerWindow()
 
-    # Add resize grips
-    self.gripSize = 16
-    self.grips = []
-    for i in range(4):
-      grip = QSizeGrip(self)
-      grip.resize(self.gripSize, self.gripSize)
-      self.grips.append(grip)
-      if debug:
-        grip.setStyleSheet("background-color: red;")
+    # Load drag resize setting
+    self.drag_resize = settings.value(f"{self.window_id}_drag_resize", False, type=bool)
+    # disable resizing
+    if not self.drag_resize:
+      self.setFixedSize(size)
+
+    if self.drag_resize:
+      # Add resize grips
+      self.gripSize = 16
+      self.grips = []
+      for i in range(4):
+        grip = QSizeGrip(self)
+        grip.resize(self.gripSize, self.gripSize)
+        self.grips.append(grip)
+        if debug:
+          grip.setStyleSheet("background-color: red;")
+
+    
 
     self.startRefreshTimer()
 
@@ -464,7 +486,7 @@ class ChartWindow(QMainWindow):
 
   def moveEvent(self, event):
     # This method is called when the window is moved
-    print(f"Move Event on window {window_id}")
+    # print(f"Move Event on window {window_id}")
     self.savePositionAndSize()
     super().moveEvent(event)
 
@@ -546,9 +568,10 @@ class ChartWindow(QMainWindow):
     else:
       self.plotStock() # replot stock to adjust to new window size
       if debug:
-        print("Resize Event")
+        print(f"Resize Event")
     # QMainWindow.resizeEvent(self, event)
-    self.positionGrips()
+    if self.drag_resize:
+      self.positionGrips()
 
   def positionGrips(self):
     rect = self.rect()
@@ -575,20 +598,24 @@ class ChartWindow(QMainWindow):
         return True
     return False
 
-  if drag_window:
-    def mousePressEvent(self, event):
+  def mousePressEvent(self, event):
+    if drag_window or self.drag_resize:
       # print("press")
       self.candidate_start_position = event.globalPosition().toPoint()
       # if not self.is_mouse_inside_grip(self.candidate_start_position):
       if not self.is_mouse_inside_grip(event.pos()):
         self.drag_start_position = self.candidate_start_position
+    else:
+      pass
 
-    def mouseReleaseEvent(self, event):
+  def mouseReleaseEvent(self, event):
+    if drag_window or self.drag_resize:
       # print("release")
       if event.button() == 1:  # Left mouse button
         self.drag_start_position = None
 
-    def mouseMoveEvent(self, event):
+  def mouseMoveEvent(self, event):
+    if drag_window or self.drag_resize:
       # print("move")
       if self.drag_start_position is not None and not self.is_mouse_inside_grip(self.drag_start_position):
         delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
@@ -740,7 +767,8 @@ if __name__ == '__main__':
         print(f"Showing Window with id {window_id}")
       window.show()
       window.plotStock()
-      window.positionGrips()
+      if window.drag_resize:
+        window.positionGrips()
       windows.append(window)
   if debug:
     print("Done")
