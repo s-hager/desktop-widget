@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidg
                              QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings
-from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont
+from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
@@ -76,7 +76,7 @@ class Settings(QMainWindow):
     super().__init__(parent)
     self.windows = windows
     self.setWindowTitle("Settings")
-    self.setGeometry(100, 100, 300, 200)
+    # self.setGeometry(100, 100, 300, 200)
     self.layout = QVBoxLayout()
 
     new_stock_layout = QHBoxLayout()
@@ -103,6 +103,13 @@ class Settings(QMainWindow):
     central_widget = QWidget()
     central_widget.setLayout(self.layout)
     self.setCentralWidget(central_widget)
+
+    # Set the window's size to a fraction of the screen's size
+    screen_size = QApplication.primaryScreen().size()  # Get the screen's size
+    fraction_of_screen = 0.3  # Set the fraction of the screen size you want the window to occupy
+    size_relative_to_screen = QSize(int(screen_size.width() * fraction_of_screen),
+                                    int(0))
+    self.resize(size_relative_to_screen)
 
   def addOpenWindows(self):
     # self.clearLayout(self.window_layout)
@@ -157,19 +164,22 @@ class Settings(QMainWindow):
       label = QLabel(self.stock_symbol)
       self.window_layout.addWidget(label)
 
+      lock_button = QPushButton()
+      lock_button.setIcon(QIcon('locked.png'))
+      lock_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+      # self.lock_button.clicked.connect(self.toggleIcon)
       # Add a button next to the label
       if debug:
         settings_button = QPushButton(f"{self.stock_symbol} Settings id:{self.window_id}")
-        delete_button = QPushButton(f"Delete {self.stock_symbol} id:{self.window_id}")
       else:
         settings_button = QPushButton(f"{self.stock_symbol} Settings")
-        delete_button = QPushButton(f"Delete {self.stock_symbol}")
+      delete_button = QPushButton(f"Delete {self.stock_symbol}")
       
       # settings_button.clicked.connect(self.test)
 
       # Attach the window object to the delete button for later access
       delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
-
+      self.window_layout.addWidget(lock_button)
       self.window_layout.addWidget(settings_button)
       self.window_layout.addWidget(delete_button)
 
@@ -281,7 +291,7 @@ class TrayIcon:
     self.windows = windows
     # Create the system tray icon
     self.tray_icon = QSystemTrayIcon(self.app)
-    self.tray_icon.setIcon(QIcon(self.resourcePath("icon.ico")))
+    self.tray_icon.setIcon(QIcon(self.resourcePath("icon.png")))
     self.tray_icon.setToolTip(app_name)
     # self.tray_icon.setStyleSheet("QSystemTrayIcon {background-color: #333333; color: #FFFFFF;}")
 
@@ -307,9 +317,15 @@ class TrayIcon:
     # Add the menu to the system tray icon
     self.tray_icon.setContextMenu(self.tray_menu)
 
+    self.tray_icon.activated.connect(self.moveToCursor)
+
     # Show the system tray icon
     self.tray_icon.show()
-      
+
+  def moveToCursor(self):
+    cursor_position = QCursor.pos()
+    self.tray_menu.move(cursor_position)
+
   def showSettingsWindow(self):
       self.settings_window = Settings(self.windows)
       self.settings_window.show()
@@ -335,6 +351,7 @@ class CustomFormatter(Formatter):
 class ChartWindow(QMainWindow):
   def __init__(self, stock_symbol, window_id=None):
     super(ChartWindow, self).__init__(parent=None)
+    self.first_resize = True
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
     window_id = window_id_counter
@@ -447,6 +464,7 @@ class ChartWindow(QMainWindow):
 
   def moveEvent(self, event):
     # This method is called when the window is moved
+    print(f"Move Event on window {window_id}")
     self.savePositionAndSize()
     super().moveEvent(event)
 
@@ -521,10 +539,18 @@ class ChartWindow(QMainWindow):
     self.refresh_timer.start(refresh_interval * 1000)
 
   def resizeEvent(self, event):
-    self.plotStock() # replot stock to adjust to new window size
-    if debug:
-      print("Resize Event")
-    QMainWindow.resizeEvent(self, event)
+    # Dont plot stock on first default resize event
+    if self.first_resize:
+      self.first_resize = False
+      return
+    else:
+      self.plotStock() # replot stock to adjust to new window size
+      if debug:
+        print("Resize Event")
+    # QMainWindow.resizeEvent(self, event)
+    self.positionGrips()
+
+  def positionGrips(self):
     rect = self.rect()
     # top left grip doesn't need to be moved...
     # top right
@@ -714,6 +740,7 @@ if __name__ == '__main__':
         print(f"Showing Window with id {window_id}")
       window.show()
       window.plotStock()
+      window.positionGrips()
       windows.append(window)
   if debug:
     print("Done")
