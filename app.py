@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
                              QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings
-from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
+from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import time
 import os
@@ -38,7 +38,7 @@ horizontal_lines_color = 'white'
 horizontal_lines_style = (0, (5, 10)) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
 horizontal_lines_transparency = 0.5
 horizontal_lines_width = 0.5
-padding_multiplier = 0.5
+padding_multiplier = 0.4
 y_label_every_x_datapoints = 100
 title_font_size = 20
 update_font_size = 8
@@ -47,7 +47,7 @@ display_refresh_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-debug = True # set to False for pyinstaller
+debug = False # set to False for pyinstaller
 # debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
@@ -73,10 +73,16 @@ debug = True # set to False for pyinstaller
 settings = QSettings("config.ini", QSettings.Format.IniFormat)
 window_id_counter = 0
 
+def resourcePath(relative_path):
+  # Get absolute path to resource, works for dev and for PyInstaller
+  base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+  return os.path.join(base_path, relative_path)
+
 class Settings(QMainWindow):
   def __init__(self, windows, parent=None):
     super().__init__(parent)
-    print("Creating Settings Object")
+    if debug:
+      print("DEBUG: Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
     # self.setGeometry(100, 100, 300, 200)
@@ -173,7 +179,7 @@ class Settings(QMainWindow):
       self.window_layout.addWidget(label)
 
       self.lock_button = QPushButton()
-      self.lock_button.setIcon(QIcon('locked.png'))
+      self.lock_button.setIcon(QIcon(resourcePath("locked.png")))
       self.lock_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
       self.lock_button.clicked.connect(self.toggleLock)
       # Add a button next to the label
@@ -195,19 +201,19 @@ class Settings(QMainWindow):
       self.window.drag_resize = not self.window.drag_resize
       if self.window.drag_resize:
         if debug:
-          print(f"Unlocking Window with id {self.window_id}")
-        self.lock_button.setIcon(QIcon('unlocked.png'))
+          print(f"DEBUG: Unlocking Window with id {self.window_id}")
+        self.lock_button.setIcon(QIcon(resourcePath("unlocked.png")))
         self.window.showResizeGrips()
         self.window.positionGrips()
         self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
-        self.window.central_widget.setStyleSheet("border: 1px solid yellow;") # yellow border to show unlocked status
+        self.window.central_widget.setStyleSheet("QWidget#central_widget { border: 2px solid yellow; }") # yellow border to show unlocked status
       else:
-        print(f"Locking Window with id {self.window_id}")
         if debug:
+          print(f"DEBUG: Locking Window with id {self.window_id}")
           self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
         else:
-          self.window.central_widget.setStyleSheet("") # remove border
-        self.lock_button.setIcon(QIcon('locked.png'))
+          self.window.central_widget.setStyleSheet("QWidget#central_widget { }") # remove border
+        self.lock_button.setIcon(QIcon(resourcePath("locked.png")))
         self.window.savePositionAndSize()
         self.window.hideResizeGrips()
         self.window.setFixedSize(self.window.size())
@@ -217,17 +223,17 @@ class Settings(QMainWindow):
 
     def deleteChartWindow(self):
       if debug:
-        print(f"Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
+        print(f"DEBUG: Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
       all_keys = settings.allKeys()
       # print(all_keys)
       for key in all_keys:
         if key.startswith(self.window_id):
           if debug:
-            print(f"Removing {key} with value {settings.value(key)} from config")
+            print(f"DEBUG: Removing {key} with value {settings.value(key)} from config")
           settings.remove(key)
       self.window.close()
       if debug:
-        print("Closed window")
+        print("DEBUG: Closed window")
       # remove layout from settings window
       self.deleteLayout()
       # for i in reversed(range(self.window_layout.count())):
@@ -252,7 +258,7 @@ class Settings(QMainWindow):
     # TODO save state
     settings.setValue("launch_on_startup", state)
 
-    if state == 2: # Checkbox is checked
+    if state: # Checkbox is checked
       self.enableLaunchOnStartup()
     else:
       self.disableLaunchOnStartup()
@@ -268,14 +274,14 @@ class Settings(QMainWindow):
         reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
         reg.CloseKey(open_key)
         if debug:
-          print(f"Successfully added to startup. Path: {app_path}")
+          print(f"DEBUG: Successfully added to startup. Path: {app_path}")
       except Exception as e: # TODO Handle exception in gui
         if debug:
-          print(f"Failed to add to startup. Error: {str(e)}")
+          print(f"DEBUG: Failed to add to startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to add to startup.")
     else:
       # if debug:
-        print("Not running .exe")
+        print("DEBUG: Not running .exe")
 
   def disableLaunchOnStartup(self):
     if self.exeFilePath():
@@ -288,19 +294,19 @@ class Settings(QMainWindow):
         if reg.QueryValueEx(open_key, app_name):
           reg.DeleteValue(open_key, app_name)
           if debug:
-            print("Successfully removed from startup.")
+            print("DEBUG: Successfully removed from startup.")
         else:
           if debug:
-            print("The registry value does not exist, nothing to remove.")
+            print("DEBUG: The registry value does not exist, nothing to remove.")
 
         reg.CloseKey(open_key)
       except Exception as e:
         if debug:
-          print(f"Failed to remove from startup. Error: {str(e)}")
+          print(f"DEBUG: Failed to remove from startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to remove from startup.")
     else:
       # if debug:
-        print("Not running .exe")
+        print("DEBUG: Not running .exe")
 
   def exeFilePath(self):
     if getattr(sys, 'frozen', False):
@@ -320,7 +326,8 @@ class Settings(QMainWindow):
     # Overriding closeEvent to hide the window instead of closing it
     self.hide()
     event.ignore()
-    print("Closed Settings")
+    if debug:
+      print("DEBUG: Closed Settings")
 
 
 class TrayIcon:
@@ -331,7 +338,7 @@ class TrayIcon:
     self.settings_window = None
     # Create the system tray icon
     self.tray_icon = QSystemTrayIcon(self.app)
-    self.tray_icon.setIcon(QIcon(self.resourcePath("icon.png")))
+    self.tray_icon.setIcon(QIcon(resourcePath("icon.png")))
     self.tray_icon.setToolTip(app_name)
     # self.tray_icon.setStyleSheet("QSystemTrayIcon {background-color: #333333; color: #FFFFFF;}")
 
@@ -368,10 +375,12 @@ class TrayIcon:
 
   def clickHandler(self, reason):
     if reason == QSystemTrayIcon.ActivationReason.Trigger: # left click
-      print("Tray Icon was left clicked")
+      if debug:
+        print("DEBUG: Tray Icon was left clicked")
       self.showSettingsWindow()
     elif reason == QSystemTrayIcon.ActivationReason.Context: # right click
-      print("Tray Icon was right clicked")
+      if debug:
+        print("DEBUG: Tray Icon was right clicked")
       self.moveMenuToCursor()
 
   def moveMenuToCursor(self):
@@ -386,14 +395,9 @@ class TrayIcon:
       else:
         # If Settings Window is already open, bring it to the front of all windows
         if debug:
-          print("Settings Window already open, bringing it to front")
+          print("DEBUG: Settings Window already open, bringing it to front")
         self.settings_window.activateWindow()
         # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
-
-  def resourcePath(self, relative_path):
-    # Get absolute path to resource, works for dev and for PyInstaller
-    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
@@ -416,7 +420,7 @@ class ChartWindow(QMainWindow):
     self.drag_start_position = None
     window_id = window_id_counter
     if debug:
-      print(f"Start Creating Window with id {window_id}")
+      print(f"DEBUG: Start Creating Window with id {window_id}")
     if window_id:
       self.window_id = f"window_{window_id}"
     else:
@@ -452,7 +456,7 @@ class ChartWindow(QMainWindow):
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
     if debug:
-      print("Blurring Background...", end="")
+      print("DEBUG: Blurring Background...", end="")
     self.blurBackground()
     if debug:
       print("Done")
@@ -494,6 +498,7 @@ class ChartWindow(QMainWindow):
 
     # Create a central widget to hold the layout
     self.central_widget = QWidget()
+    self.central_widget.setObjectName("central_widget")
     self.central_widget.setLayout(layout)
     self.setCentralWidget(self.central_widget)
     if debug:
@@ -503,6 +508,12 @@ class ChartWindow(QMainWindow):
 
     self.addResizeGrips()
     self.startRefreshTimer()
+
+  # def paintEvent(self, event):
+  #   rounded_rect_path = QPainterPath()
+  #   rounded_rect_path.addRoundedRect(QRectF(self.rect()), 10.0, 10.0)
+  #   region_ = QRegion(rounded_rect_path.toFillPolygon().toPolygon())
+  #   self.setMask(region_)
 
   # def roundCorners(self):
   #   # Create a QPainterPath with rounded corners
@@ -554,7 +565,7 @@ class ChartWindow(QMainWindow):
   def downloadStockData(self):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
     if debug:
-      print("Downloading Stock Data...")
+      print("DEBUG: Downloading Stock Data...")
       self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     else:
       self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -588,7 +599,7 @@ class ChartWindow(QMainWindow):
   def updateRefreshTimeLabel(self):
     self.refresh_time_label.setText(self.update_time)
     if debug:
-      print(f"Updated Refresh Time to {self.update_time}")
+      print(f"DEBUG: Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
     if debug:
@@ -608,7 +619,7 @@ class ChartWindow(QMainWindow):
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
     if debug:
-      self.refresh_timer.timeout.connect(lambda: print("Refreshing Plot..."))
+      self.refresh_timer.timeout.connect(lambda: print("DEBUG: Refreshing Plot..."))
     self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
     self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
@@ -625,7 +636,7 @@ class ChartWindow(QMainWindow):
     else:
       self.plotStock() # replot stock to adjust to new window size
       if debug:
-        print(f"Resize Event")
+        print(f"DEBUG: Resize Event")
     # QMainWindow.resizeEvent(self, event)
     if self.drag_resize:
       self.positionGrips()
@@ -645,16 +656,12 @@ class ChartWindow(QMainWindow):
   def centerWindow(self):
     # Get the center position of the primary screen
     center_point = QGuiApplication.primaryScreen().availableGeometry().center()
-    print(center_point)
     # Calculate the top-left position for the window
     window_geometry = self.frameGeometry()
-    print(window_geometry)
     window_geometry.moveCenter(center_point)
-    print(window_geometry)
     self.centered_position = window_geometry.topLeft()
     # Move the window to the center position
     self.move(self.centered_position)
-    print(self.pos())
 
   def is_mouse_inside_grip(self, pos):
     # print(pos)
@@ -706,7 +713,7 @@ class ChartWindow(QMainWindow):
       return formatted_date
 
     if debug:
-      print("Plotting Stock...", end="")
+      print("DEBUG: Plotting Stock...", end="")
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -814,14 +821,14 @@ class ChartWindow(QMainWindow):
 
 if __name__ == '__main__':
   if debug:
-    print("Starting")
+    print("DEBUG: Starting")
   import sys
   # used to end app with ctrl + c
   import signal
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
   if debug:
-    print("Creating Application...", end="")
+    print("DEBUG: Creating Application...", end="")
   app = QApplication(sys.argv)
   if debug:
     print("Done")
@@ -836,13 +843,13 @@ if __name__ == '__main__':
         window_id_counter = window_id
       window = ChartWindow(window_symbol, window_id)
       if debug:
-        print(f"Showing Window with id {window_id}")
+        print(f"DEBUG: Showing Window with id {window_id}")
       window.show()
       window.plotStock()
       windows.append(window)
   if debug:
     print("Done")
-    print("Creating Tray Icon...", end="")
+    print("DEBUG: Creating Tray Icon...", end="")
   tray_icon = TrayIcon(app, windows)
   if debug:
     print("Done")
