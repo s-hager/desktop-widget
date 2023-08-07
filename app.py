@@ -201,8 +201,13 @@ class Settings(QMainWindow):
         self.window.showResizeGrips()
         self.window.positionGrips()
         self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
+        self.window.central_widget.setStyleSheet("border: 1px solid yellow;") # yellow border to show unlocked status
       else:
         print(f"Locking Window with id {self.window_id}")
+        if debug:
+          self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
+        else:
+          self.window.central_widget.setStyleSheet("") # remove border
         self.lock_button.setIcon(QIcon('locked.png'))
         self.window.savePositionAndSize()
         self.window.hideResizeGrips()
@@ -321,6 +326,8 @@ class TrayIcon:
   def __init__(self, app, windows):
     self.app = app
     self.windows = windows
+    # Ensure only one settings window exists at a time:
+    self.settings_window = None
     # Create the system tray icon
     self.tray_icon = QSystemTrayIcon(self.app)
     self.tray_icon.setIcon(QIcon(self.resourcePath("icon.png")))
@@ -353,18 +360,34 @@ class TrayIcon:
     # Add the menu to the system tray icon
     self.tray_icon.setContextMenu(self.tray_menu)
 
-    self.tray_icon.activated.connect(self.moveToCursor)
+    self.tray_icon.activated.connect(self.clickHandler)
 
     # Show the system tray icon
     self.tray_icon.show()
 
-  def moveToCursor(self):
+  def clickHandler(self, reason):
+    if reason == QSystemTrayIcon.ActivationReason.Trigger: # left click
+      print("Tray Icon was left clicked")
+      self.showSettingsWindow()
+    elif reason == QSystemTrayIcon.ActivationReason.Context: # right click
+      print("Tray Icon was right clicked")
+      self.moveMenuToCursor()
+
+  def moveMenuToCursor(self):
     cursor_position = QCursor.pos()
     self.tray_menu.move(cursor_position)
 
   def showSettingsWindow(self):
-      self.settings_window = Settings(self.windows)
-      self.settings_window.show()
+      if not self.settings_window:
+        self.settings_window = Settings(self.windows)
+        self.settings_window.show()
+        self.settings_window.activateWindow()
+      else:
+        # If Settings Window is already open, bring it to the front of all windows
+        if debug:
+          print("Settings Window already open, bringing it to front")
+        self.settings_window.activateWindow()
+        # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
 
   def resourcePath(self, relative_path):
     # Get absolute path to resource, works for dev and for PyInstaller
@@ -457,11 +480,11 @@ class ChartWindow(QMainWindow):
     # layout.setContentsMargins(0, 0, 0, 0)
 
     # Create a central widget to hold the layout
-    central_widget = QWidget()
-    central_widget.setLayout(layout)
-    self.setCentralWidget(central_widget)
+    self.central_widget = QWidget()
+    self.central_widget.setLayout(layout)
+    self.setCentralWidget(self.central_widget)
     if debug:
-      central_widget.setStyleSheet("border: 1px solid red;")
+      self.central_widget.setStyleSheet("border: 1px solid red;")
 
     self.canvas.installEventFilter(self)
 
