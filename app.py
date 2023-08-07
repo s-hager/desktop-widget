@@ -77,6 +77,7 @@ window_id_counter = 0
 class Settings(QMainWindow):
   def __init__(self, windows, parent=None):
     super().__init__(parent)
+    print("Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
     # self.setGeometry(100, 100, 300, 200)
@@ -101,6 +102,7 @@ class Settings(QMainWindow):
     self.launch_on_startup_checkbox.clicked.connect(self.launchOnStartupChanged)
     self.layout.addWidget(self.launch_on_startup_checkbox)
 
+    self.settings_stock_layouts = []
     self.addOpenWindows()
 
     central_widget = QWidget()
@@ -118,8 +120,10 @@ class Settings(QMainWindow):
     # self.clearLayout(self.window_layout)
     for window in self.windows:
       # Add the QHBoxLayout for this window to the main QVBoxLayout
-      self.layout.addLayout(self.SettingsStockLayout(window).getLayout())
-    
+      new_settings_stock_object = self.SettingsStockLayout(window)
+      self.settings_stock_layouts.append(new_settings_stock_object)
+      self.layout.addLayout(new_settings_stock_object.getLayout())
+
     # previous_old_id = None
     # previous_new_id = None
     # for i, key in enumerate(settings.allKeys()):
@@ -151,7 +155,9 @@ class Settings(QMainWindow):
       new_window.show()
       new_window.plotStock()
       windows.append(new_window)
-      self.layout.addLayout(self.SettingsStockLayout(new_window).getLayout())
+      new_settings_stock_object = self.SettingsStockLayout(new_window)
+      self.settings_stock_layouts.append(new_settings_stock_object)
+      self.layout.addLayout(new_settings_stock_object.getLayout())
 
   class SettingsStockLayout(QHBoxLayout):
     def __init__(self, window, parent=None):
@@ -189,11 +195,14 @@ class Settings(QMainWindow):
     def toggleLock(self):
       self.window.drag_resize = not self.window.drag_resize
       if self.window.drag_resize:
+        if debug:
+          print(f"Unlocking Window with id {self.window_id}")
         self.lock_button.setIcon(QIcon('unlocked.png'))
         self.window.showResizeGrips()
         self.window.positionGrips()
         self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
       else:
+        print(f"Locking Window with id {self.window_id}")
         self.lock_button.setIcon(QIcon('locked.png'))
         self.window.savePositionAndSize()
         self.window.hideResizeGrips()
@@ -297,9 +306,16 @@ class Settings(QMainWindow):
       return False
 
   def closeEvent(self, event):
+    # lock window positions and sizes if unlocked
+    for settings_stock_layout in self.settings_stock_layouts:
+      if settings_stock_layout.window.drag_resize:
+        settings_stock_layout.toggleLock()
+    
     # Overriding closeEvent to hide the window instead of closing it
     self.hide()
     event.ignore()
+    print("Closed Settings")
+
 
 class TrayIcon:
   def __init__(self, app, windows):
