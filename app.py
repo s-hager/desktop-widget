@@ -23,8 +23,10 @@ import functools
 app_name="StockWidget" # used as name for reg variable for auto startup
 # stock_symbol = "mu"
 legend_color = 'white'
-chart_area_color = 'green'
-chart_line_color = '#4ece6f'
+chart_area_color_positive = 'green'
+chart_area_color_negative = '#a60c0c'
+chart_line_color_positive = '#4ece6f'
+chart_line_color_negative = '#ff2626'
 area_chart = True
 monday_lines = True
 monday_lines_color = 'white'
@@ -186,11 +188,16 @@ class Settings(QMainWindow):
 
     def toggleLock(self):
       self.window.drag_resize = not self.window.drag_resize
-      settings.setValue(f"{self.window_id}_drag_resize", self.window.drag_resize)
       if self.window.drag_resize:
         self.lock_button.setIcon(QIcon('unlocked.png'))
+        self.window.showResizeGrips()
+        self.window.positionGrips()
+        self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
       else:
         self.lock_button.setIcon(QIcon('locked.png'))
+        self.window.savePositionAndSize()
+        self.window.hideResizeGrips()
+        self.window.setFixedSize(self.window.size())
 
     def getLayout(self):
       return self.window_layout
@@ -385,10 +392,10 @@ class ChartWindow(QMainWindow):
     # self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
 
     # Load settings from config file and move window
-    pos = settings.value(f"{self.window_id}_pos", QPoint(QGuiApplication.primaryScreen().availableGeometry().center()), type=QPoint)
-    size = settings.value(f"{self.window_id}_size", QSize(size_relative_to_screen), type=QSize)
-    self.move(pos)
-    self.resize(size)
+    self.settings_position = settings.value(f"{self.window_id}_pos", QPoint(QGuiApplication.primaryScreen().availableGeometry().center()), type=QPoint)
+    self.settings_size = settings.value(f"{self.window_id}_size", QSize(size_relative_to_screen), type=QSize)
+    self.move(self.settings_position)
+    self.resize(self.settings_size)
     self.setWindowTitle(f"{self.window_id}")
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
@@ -446,25 +453,12 @@ class ChartWindow(QMainWindow):
       # Center the window on the screen
       self.centerWindow()
 
-    # Load drag resize setting
-    self.drag_resize = settings.value(f"{self.window_id}_drag_resize", False, type=bool)
+    self.drag_resize = False
     # disable resizing
     if not self.drag_resize:
-      self.setFixedSize(size)
+      self.setFixedSize(self.settings_size)
 
-    if self.drag_resize:
-      # Add resize grips
-      self.gripSize = 16
-      self.grips = []
-      for i in range(4):
-        grip = QSizeGrip(self)
-        grip.resize(self.gripSize, self.gripSize)
-        self.grips.append(grip)
-        if debug:
-          grip.setStyleSheet("background-color: red;")
-
-    
-
+    self.addResizeGrips()
     self.startRefreshTimer()
 
   # def roundCorners(self):
@@ -484,11 +478,31 @@ class ChartWindow(QMainWindow):
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
-  def moveEvent(self, event):
-    # This method is called when the window is moved
-    # print(f"Move Event on window {window_id}")
-    self.savePositionAndSize()
-    super().moveEvent(event)
+  def addResizeGrips(self):
+    # Add resize grips
+    self.gripSize = 16
+    self.grips = []
+    for i in range(4):
+      grip = QSizeGrip(self)
+      grip.resize(self.gripSize, self.gripSize)
+      self.grips.append(grip)
+      if debug:
+        grip.setStyleSheet("background-color: red;")
+      grip.setVisible(False)
+
+  def showResizeGrips(self):
+    for i, grip in enumerate(self.grips):
+      grip.setVisible(True)
+
+  def hideResizeGrips(self):
+    for i, grip in enumerate(self.grips):
+      grip.setVisible(False)
+
+  # def moveEvent(self, event):
+  #   # This method is called when the window is moved
+  #   # print(f"Move Event on window {window_id}")
+  #   self.savePositionAndSize()
+  #   super().moveEvent(event)
 
   def savePositionAndSize(self):
     settings.setValue(f"{self.window_id}_pos", self.pos())
@@ -660,21 +674,28 @@ class ChartWindow(QMainWindow):
     ax = self.figure.add_subplot(111)
     ax.xaxis.set_major_formatter(formatter)
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(self.format_y_tick_label))
-    self.data['Close'].plot(ax=ax, color=chart_line_color)
+    if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+      self.data['Close'].plot(ax=ax, color=chart_line_color_negative)
+    else:
+      self.data['Close'].plot(ax=ax, color=chart_line_color_positive)
     self.figure.set_tight_layout({'pad': 0.1}) # TODO 0.1 otherwise right border is not visible
 
     # Fill the area below the stock price line with a color
     if area_chart:
-      ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color, alpha=0.3, zorder=-1)
+      if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+        ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_negative, alpha=0.3, zorder=-1)
+      else:
+        ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_positive, alpha=0.3, zorder=-1)
 
     # Customize the plot
     # ax.set_xlabel('Date', color='white', fontsize=10)
     # ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
     # ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
-    if debug:
-      ax.set_facecolor('yellow')
-    else:
-      ax.set_facecolor('none')
+    # if debug:
+    #   ax.set_facecolor('yellow')
+    # else:
+    ax.set_facecolor('none')
+
     ax.tick_params(which='minor', size=0)
     ax.tick_params(color=legend_color, labelcolor=legend_color)
     ax.tick_params(left = False, bottom = False)
@@ -767,8 +788,6 @@ if __name__ == '__main__':
         print(f"Showing Window with id {window_id}")
       window.show()
       window.plotStock()
-      if window.drag_resize:
-        window.positionGrips()
       windows.append(window)
   if debug:
     print("Done")
