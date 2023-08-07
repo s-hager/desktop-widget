@@ -42,7 +42,6 @@ padding_multiplier = 0.5
 y_label_every_x_datapoints = 100
 title_font_size = 20
 update_font_size = 8
-center_window = False
 drag_window = False
 display_refresh_time = True
 refresh_interval = 3600 # seconds
@@ -150,8 +149,8 @@ class Settings(QMainWindow):
       self.textbox.clear() # clear user input from textbox
       window_id_counter += 1
       window_id = window_id_counter
-      new_window = ChartWindow(stock_symbol)
       settings.setValue(f"window_{window_id}_symbol", stock_symbol)
+      new_window = ChartWindow(stock_symbol)
       new_window.show()
       new_window.plotStock()
       windows.append(new_window)
@@ -273,6 +272,7 @@ class Settings(QMainWindow):
       except Exception as e: # TODO Handle exception in gui
         if debug:
           print(f"Failed to add to startup. Error: {str(e)}")
+        QMessageBox.critical(self, "Error", "Failed to add to startup.")
     else:
       # if debug:
         print("Not running .exe")
@@ -297,6 +297,7 @@ class Settings(QMainWindow):
       except Exception as e:
         if debug:
           print(f"Failed to remove from startup. Error: {str(e)}")
+        QMessageBox.critical(self, "Error", "Failed to remove from startup.")
     else:
       # if debug:
         print("Not running .exe")
@@ -430,11 +431,23 @@ class ChartWindow(QMainWindow):
                                     int(screen_size.height() * fraction_of_screen))
     # self.resize(self.sizeHint().expandedTo(size_relative_to_screen))
 
+    self.drag_resize = False
+    # disable resizing
+
     # Load settings from config file and move window
-    self.settings_position = settings.value(f"{self.window_id}_pos", QPoint(QGuiApplication.primaryScreen().availableGeometry().center()), type=QPoint)
-    self.settings_size = settings.value(f"{self.window_id}_size", QSize(size_relative_to_screen), type=QSize)
-    self.move(self.settings_position)
-    self.resize(self.settings_size)
+    self.settings_position = settings.value(f"{self.window_id}_pos", type=QPoint)
+    self.settings_size = settings.value(f"{self.window_id}_size", type=QSize)
+    if self.settings_position.isNull() or self.settings_size.isEmpty():
+      # Center the window on the screen
+      self.resize(size_relative_to_screen)
+      self.centerWindow() # order matters -> after resize
+      settings.setValue(f"{self.window_id}_pos", QPoint(self.centered_position))
+      settings.setValue(f"{self.window_id}_size", QSize(size_relative_to_screen))
+      self.setFixedSize(size_relative_to_screen)
+    else:
+      self.resize(self.settings_size)
+      self.move(self.settings_position)
+      self.setFixedSize(self.settings_size)
     self.setWindowTitle(f"{self.window_id}")
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
@@ -487,15 +500,6 @@ class ChartWindow(QMainWindow):
       self.central_widget.setStyleSheet("border: 1px solid red;")
 
     self.canvas.installEventFilter(self)
-
-    if center_window:
-      # Center the window on the screen
-      self.centerWindow()
-
-    self.drag_resize = False
-    # disable resizing
-    if not self.drag_resize:
-      self.setFixedSize(self.settings_size)
 
     self.addResizeGrips()
     self.startRefreshTimer()
@@ -639,10 +643,18 @@ class ChartWindow(QMainWindow):
     # time.sleep(0.01)
 
   def centerWindow(self):
-    frame_geometry = self.frameGeometry()
-    screen_center = QGuiApplication.primaryScreen().availableGeometry().center()
-    frame_geometry.moveCenter(screen_center)
-    self.move(frame_geometry.topLeft())
+    # Get the center position of the primary screen
+    center_point = QGuiApplication.primaryScreen().availableGeometry().center()
+    print(center_point)
+    # Calculate the top-left position for the window
+    window_geometry = self.frameGeometry()
+    print(window_geometry)
+    window_geometry.moveCenter(center_point)
+    print(window_geometry)
+    self.centered_position = window_geometry.topLeft()
+    # Move the window to the center position
+    self.move(self.centered_position)
+    print(self.pos())
 
   def is_mouse_inside_grip(self, pos):
     # print(pos)
