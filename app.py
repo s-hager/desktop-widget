@@ -29,6 +29,7 @@ chart_area_color_negative = '#a60c0c'
 chart_line_color_positive = '#4ece6f'
 chart_line_color_negative = '#ff2626'
 area_chart = True
+bought_line = True
 monday_lines = True
 monday_lines_color = 'white'
 monday_lines_style = 'solid' # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
@@ -48,8 +49,8 @@ display_refresh_time = True
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
-debug = False # set to False for pyinstaller
-# debug = True # set to False for pyinstaller
+# debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
 
 ## TODO
@@ -81,7 +82,6 @@ def appDirectoryPath(file):
 
 ### --------------------------- Global Constants --------------------------- ###
 settings = QSettings(appDirectoryPath("config.ini"), QSettings.Format.IniFormat)
-print(appDirectoryPath("config.ini"))
 window_id_counter = 0
 ### ------------------------------------------------------------------------ ###
 
@@ -138,7 +138,7 @@ class Settings(QMainWindow):
     # self.clearLayout(self.window_layout)
     for window in self.windows:
       # Add the QHBoxLayout for this window to the main QVBoxLayout
-      new_settings_stock_object = self.SettingsStockLayout(window)
+      new_settings_stock_object = self.SettingsStockLayout(self, window)
       self.settings_stock_layouts.append(new_settings_stock_object)
       self.layout.addLayout(new_settings_stock_object.getLayout())
 
@@ -173,13 +173,14 @@ class Settings(QMainWindow):
       new_window.show()
       new_window.plotStock()
       windows.append(new_window)
-      new_settings_stock_object = self.SettingsStockLayout(new_window)
+      new_settings_stock_object = self.SettingsStockLayout(self, new_window)
       self.settings_stock_layouts.append(new_settings_stock_object)
       self.layout.addLayout(new_settings_stock_object.getLayout())
 
   class SettingsStockLayout(QHBoxLayout):
-    def __init__(self, window, parent=None):
+    def __init__(self, settings, window, parent=None):
       super().__init__(parent)
+      self.settings = settings
       self.window = window
       self.window_id = window.window_id
       self.stock_symbol = window.stock_symbol
@@ -200,12 +201,11 @@ class Settings(QMainWindow):
         settings_button = QPushButton(f"{self.stock_symbol} Settings id:{self.window_id}")
       else:
         settings_button = QPushButton(f"{self.stock_symbol} Settings")
-      delete_button = QPushButton(f"Delete {self.stock_symbol}")
-      
-      # settings_button.clicked.connect(self.test)
+      # settings_button.clicked.connect(self.stock_symbol_settings)
 
-      # Attach the window object to the delete button for later access
+      delete_button = QPushButton(f"Delete {self.stock_symbol}")
       delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
+      
       self.window_layout.addWidget(self.lock_button)
       self.window_layout.addWidget(settings_button)
       self.window_layout.addWidget(delete_button)
@@ -249,12 +249,9 @@ class Settings(QMainWindow):
         print("DEBUG: Closed window")
       # remove layout from settings window
       self.deleteLayout()
-      # for i in reversed(range(self.window_layout.count())):
-      #   item = self.window_layout.itemAt(i)
-      #   print(item)
-      #   if item.layout() and item.layout().widget() and hasattr(item.layout().widget(), "window_id"):
-      #     if item.layout().widget().window_id == self.window_id:
-      #       self.window_layout.removeItem(item)
+      # Remove the instance from settings_stock_layouts list
+      if self in self.settings.settings_stock_layouts:
+        self.settings.settings_stock_layouts.remove(self)
 
     def deleteLayout(self):
       # Remove all widgets from the layout
@@ -337,7 +334,8 @@ class Settings(QMainWindow):
         settings_stock_layout.toggleLock()
     
     # Overriding closeEvent to hide the window instead of closing it
-    self.hide()
+    # self.hide()
+    self.destroy()
     event.ignore()
     if debug:
       print("DEBUG: Closed Settings")
@@ -400,15 +398,25 @@ class TrayIcon:
     cursor_position = QCursor.pos()
     self.tray_menu.move(cursor_position)
 
+  def clear_settings_reference(self):
+    self.settings_window = None
+    print("Cleared.....")
+    print(self.settings_window)
+
   def showSettingsWindow(self):
-      if not self.settings_window:
+      if self.settings_window is None:
+        print(self.settings_window)
         self.settings_window = Settings(self.windows)
+        self.settings_window.destroyed.connect(functools.partial(self.clear_settings_reference))
+        print(self.settings_window)
         self.settings_window.show()
         self.settings_window.activateWindow()
       else:
         # If Settings Window is already open, bring it to the front of all windows
         if debug:
-          print("DEBUG: Settings Window already open, bringing it to front")
+          print("DEBUG: Settings Window Instance already exists, showing and bringing it to front")
+        print(self.settings_window)
+        self.settings_window.show()
         self.settings_window.activateWindow()
         # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
 
@@ -432,6 +440,7 @@ class ChartWindow(QMainWindow):
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
     window_id = window_id_counter
+    self.value_to_highlight = 68.82
     if debug:
       print(f"DEBUG: Start Creating Window with id {window_id}")
     if window_id:
@@ -757,6 +766,10 @@ class ChartWindow(QMainWindow):
         ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_negative, alpha=0.3, zorder=-1)
       else:
         ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_positive, alpha=0.3, zorder=-1)
+
+    if bought_line:
+      ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
+      ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
 
     # Customize the plot
     # ax.set_xlabel('Date', color='white', fontsize=10)
