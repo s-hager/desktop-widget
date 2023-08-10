@@ -1,2 +1,4 @@
 build
 dist
+old_builds
+venv

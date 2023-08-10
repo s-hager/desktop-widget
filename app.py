@@ -16,6 +16,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import sys
 
 import functools
 
@@ -69,9 +70,20 @@ debug = False # set to False for pyinstaller
 # base amount of y axis tick labels on window size
 # use createNewChartWindow also at startup
 
-# Global Constants
-settings = QSettings("config.ini", QSettings.Format.IniFormat)
+def appDirectoryPath(file):
+  if getattr(sys, 'frozen', False):
+    # Running as compiled executable (e.g., PyInstaller)
+    application_directory = os.path.dirname(sys.executable)
+  else:
+    # Running as a script
+    application_directory = os.path.dirname(os.path.abspath(__file__))
+  return os.path.join(application_directory, file)
+
+### --------------------------- Global Constants --------------------------- ###
+settings = QSettings(appDirectoryPath("config.ini"), QSettings.Format.IniFormat)
+print(appDirectoryPath("config.ini"))
 window_id_counter = 0
+### ------------------------------------------------------------------------ ###
 
 def resourcePath(relative_path):
   # Get absolute path to resource, works for dev and for PyInstaller
@@ -85,6 +97,7 @@ class Settings(QMainWindow):
       print("DEBUG: Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
+    self.setWindowIcon(QIcon(resourcePath("icon.png")))
     # self.setGeometry(100, 100, 300, 200)
     self.layout = QVBoxLayout()
 
