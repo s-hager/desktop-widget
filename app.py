@@ -4,10 +4,12 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidg
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
+import sys
 import time
 import os
 import re
-import winreg as reg
+if 'nt' in sys.builtin_module_names:
+  import winreg as reg
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -16,7 +18,6 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
-import sys
 
 import functools
 
@@ -339,6 +340,9 @@ class Settings(QMainWindow):
     event.ignore()
     if debug:
       print("DEBUG: Closed Settings")
+    close_settings = pyqtSignal()
+    self.close_settings.emit()  # Emit custom signal
+    super().closeEvent(event)
 
 
 class TrayIcon:
@@ -407,7 +411,8 @@ class TrayIcon:
       if self.settings_window is None:
         print(self.settings_window)
         self.settings_window = Settings(self.windows)
-        self.settings_window.destroyed.connect(functools.partial(self.clear_settings_reference))
+        self.settings_window.close_settings.connect(self.clear_settings_reference)
+        self.settings_window.close_settings.connect(lambda: print("WORKS"))
         print(self.settings_window)
         self.settings_window.show()
         self.settings_window.activateWindow()
