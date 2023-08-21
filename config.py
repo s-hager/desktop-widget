@@ -1,0 +1,32 @@
+### -------------------------------- Config -------------------------------- ###
+app_name="StockWidget" # used as name for reg variable for auto startup
+# stock_symbol = "mu"
+legend_color = 'white'
+chart_area_color_positive = 'green'
+chart_area_color_negative = '#a60c0c'
+chart_line_color_positive = '#4ece6f'
+chart_line_color_negative = '#ff2626'
+area_chart = True
+bought_line = True
+monday_lines = True
+monday_lines_color = 'white'
+monday_lines_style = 'solid' # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
+monday_lines_transparency = 0.5
+monday_lines_width = 1
+horizontal_lines = True
+horizontal_lines_color = 'white'
+horizontal_lines_style = (0, (5, 10)) # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
+horizontal_lines_transparency = 0.5
+horizontal_lines_width = 0.5
+padding_multiplier = 0.4
+y_label_every_x_datapoints = 100
+title_font_size = 20
+update_font_size = 8
+drag_window = False
+display_refresh_time = True
+refresh_interval = 3600 # seconds
+# refresh_interval = 20 # seconds
+window_margins = [10, 10, 10, 10]
+# debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
+### ------------------------------------------------------------------------ ###
