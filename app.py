@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
                              QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF, pyqtSignal
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import sys
@@ -92,6 +92,7 @@ def resourcePath(relative_path):
   return os.path.join(base_path, relative_path)
 
 class Settings(QMainWindow):
+  close_settings = pyqtSignal()
   def __init__(self, windows, parent=None):
     super().__init__(parent)
     if debug:
@@ -337,12 +338,11 @@ class Settings(QMainWindow):
     # Overriding closeEvent to hide the window instead of closing it
     # self.hide()
     self.destroy()
-    event.ignore()
+    event.ignore() # ignore close event (would cause program to exit)
     if debug:
       print("DEBUG: Closed Settings")
-    close_settings = pyqtSignal()
     self.close_settings.emit()  # Emit custom signal
-    super().closeEvent(event)
+    # super().closeEvent(event)
 
 
 class TrayIcon:
@@ -404,26 +404,20 @@ class TrayIcon:
 
   def clear_settings_reference(self):
     self.settings_window = None
-    print("Cleared.....")
-    print(self.settings_window)
 
   def showSettingsWindow(self):
-      if self.settings_window is None:
-        print(self.settings_window)
-        self.settings_window = Settings(self.windows)
-        self.settings_window.close_settings.connect(self.clear_settings_reference)
-        self.settings_window.close_settings.connect(lambda: print("WORKS"))
-        print(self.settings_window)
-        self.settings_window.show()
-        self.settings_window.activateWindow()
-      else:
-        # If Settings Window is already open, bring it to the front of all windows
-        if debug:
-          print("DEBUG: Settings Window Instance already exists, showing and bringing it to front")
-        print(self.settings_window)
-        self.settings_window.show()
-        self.settings_window.activateWindow()
-        # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
+    if self.settings_window is None:
+      self.settings_window = Settings(self.windows)
+      self.settings_window.close_settings.connect(self.clear_settings_reference)
+      self.settings_window.show()
+      self.settings_window.activateWindow()
+    else:
+      # If Settings Window is already open, bring it to the front of all windows
+      if debug:
+        print("DEBUG: Settings Window Instance already exists, showing and bringing it to front")
+      self.settings_window.show()
+      self.settings_window.activateWindow()
+      # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
 class CustomFormatter(Formatter):
