@@ -46,12 +46,16 @@ from chart_window import ChartWindow # TODO: rewrite so this is not required her
 # make resizing smoother
 # base amount of y axis tick labels on window size
 # use createNewChartWindow also at startup
+# fix program closing after waking up from sleep mode
+# fix program behaviour when monitor is connected/disconnected
 
 def main():
   if log_to_file:
     logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+    # logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
   else:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+    # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
   global window_id_counter
   if debug:
     logging.info("Starting")

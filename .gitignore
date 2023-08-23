@@ -3,3 +3,4 @@ dist
 old_builds
 venv
 *.log
+__pycache__

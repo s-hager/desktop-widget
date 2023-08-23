@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 import logging
+import time
 
 # own variables:
 from config import *
@@ -36,7 +37,8 @@ class ChartWindow(QMainWindow):
     self.first_resize = True
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
-    window_id = window_id_counter
+    if not window_id:
+      window_id = window_id_counter
     self.value_to_highlight = 68.82
     if debug:
       logging.info(f"Start Creating Window with id {window_id}")
@@ -187,10 +189,17 @@ class ChartWindow(QMainWindow):
       logging.info("Downloading Stock Data...")
       # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # else:
-    self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
-    self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+    while True:
+      try:
+        self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+        self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
+        self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+        break
+      except Exception as e:
+        logging.info(f"An exception occured: {e}")
+        logging.info("Retrying in 5 seconds...")
+        time.sleep(1)
 
   def replaceCurrencySymbols(self, text):
     currency_symbols = {

@@ -4,20 +4,20 @@ from PyQt6.QtGui import QIcon, QAction, QCursor
 import logging
 
 # own files:
-from settings_window import Settings
-from utils import resourcePath
+from settings_window import SettingsWindow
 # own variables:
 from config import *
+from constants import *
 
 class TrayIcon:
   def __init__(self, app, windows):
     self.app = app
     self.windows = windows
     # Ensure only one settings window exists at a time:
-    self.settings_window = None
+    self.clearSettingsReference()
     # Create the system tray icon
     self.tray_icon = QSystemTrayIcon(self.app)
-    self.tray_icon.setIcon(QIcon(resourcePath("icon.png")))
+    self.tray_icon.setIcon(QIcon(app_icon))
     self.tray_icon.setToolTip(app_name)
     # self.tray_icon.setStyleSheet("QSystemTrayIcon {background-color: #333333; color: #FFFFFF;}")
 
@@ -33,10 +33,10 @@ class TrayIcon:
 
     # show settings if no windows in config
     if not windows:
-      self.showSettingsWindow()
+      self.openSettingsWindow()
 
-    self.open_settings.triggered.connect(self.showSettingsWindow)
-    self.quit_action.triggered.connect(lambda: QCoreApplication.quit())
+    self.open_settings.triggered.connect(self.openSettingsWindow)
+    self.quit_action.triggered.connect(self.quitApp)
     # self.enable_startup_action.triggered.connect(self.enableLaunchOnStartup)
     # self.disable_startup_action.triggered.connect(self.disableLaunchOnStartup)
     self.tray_menu.addAction(self.open_settings)
@@ -52,11 +52,16 @@ class TrayIcon:
     # Show the system tray icon
     self.tray_icon.show()
 
+  def quitApp(self):
+    if debug:
+      logging.info("Quitting Application")
+    QCoreApplication.quit()
+
   def clickHandler(self, reason):
     if reason == QSystemTrayIcon.ActivationReason.Trigger: # left click
       if debug:
         logging.info("Tray Icon was left clicked")
-      self.showSettingsWindow()
+      self.openSettingsWindow()
     elif reason == QSystemTrayIcon.ActivationReason.Context: # right click
       if debug:
         logging.info("Tray Icon was right clicked")
@@ -66,13 +71,13 @@ class TrayIcon:
     cursor_position = QCursor.pos()
     self.tray_menu.move(cursor_position)
 
-  def clear_settings_reference(self):
+  def clearSettingsReference(self):
     self.settings_window = None
 
-  def showSettingsWindow(self):
+  def openSettingsWindow(self):
     if self.settings_window is None:
-      self.settings_window = Settings(self.windows)
-      self.settings_window.close_settings.connect(self.clear_settings_reference)
+      self.settings_window = SettingsWindow(self.windows)
+      self.settings_window.close_settings_signal.connect(self.clearSettingsReference)
       self.settings_window.show()
       self.settings_window.activateWindow()
     else:

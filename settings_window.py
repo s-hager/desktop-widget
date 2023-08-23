@@ -12,19 +12,20 @@ import logging
 # own files:
 from utils import resourcePath
 from chart_window import ChartWindow
+from chart_settings_window import ChartSettingsWindow
 # own variables:
 from config import *
 from constants import *
 
-class Settings(QMainWindow):
-  close_settings = pyqtSignal()
+class SettingsWindow(QMainWindow):
+  close_settings_signal = pyqtSignal()
   def __init__(self, windows, parent=None):
     super().__init__(parent)
     if debug:
       logging.info("Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
-    self.setWindowIcon(QIcon(resourcePath("icon.png")))
+    self.setWindowIcon(QIcon(app_icon))
     # self.setGeometry(100, 100, 300, 200)
     self.layout = QVBoxLayout()
 
@@ -93,9 +94,9 @@ class Settings(QMainWindow):
       QMessageBox.critical(self, "Error", "Stock Symbol cannot be empty.")
     else:
       self.textbox.clear() # clear user input from textbox
-      window_id_counter += 1
       window_id = window_id_counter
       settings.setValue(f"window_{window_id}_symbol", stock_symbol)
+      window_id_counter += 1
       new_window = ChartWindow(stock_symbol)
       new_window.show()
       new_window.plotStock()
@@ -111,6 +112,7 @@ class Settings(QMainWindow):
       self.window = window
       self.window_id = window.window_id
       self.stock_symbol = window.stock_symbol
+      self.clearChartSettingsWindowReference()
 
       # Create a QHBoxLayout for each window label and button
       self.window_layout = QHBoxLayout()
@@ -128,7 +130,7 @@ class Settings(QMainWindow):
         settings_button = QPushButton(f"{self.stock_symbol} Settings id:{self.window_id}")
       else:
         settings_button = QPushButton(f"{self.stock_symbol} Settings")
-      settings_button.clicked.connect(self.chartWindowSettings)
+      settings_button.clicked.connect(self.openChartSettingsWindow)
 
       delete_button = QPushButton(f"Delete {self.stock_symbol}")
       delete_button.clicked.connect(functools.partial(self.deleteChartWindow))
@@ -137,8 +139,20 @@ class Settings(QMainWindow):
       self.window_layout.addWidget(settings_button)
       self.window_layout.addWidget(delete_button)
 
-    def chartWindowSettings(self):
-      pass
+    def clearChartSettingsWindowReference(self):
+      self.chart_settings_window = None
+
+    def openChartSettingsWindow(self):
+      if self.chart_settings_window is None:
+        self.chart_settings_window = ChartSettingsWindow(self, self.window)
+        self.chart_settings_window.show()
+        self.chart_settings_window.activateWindow()
+      else:
+        # If Window is already open, bring it to the front of all windows
+        if debug:
+          logging.info(f"Chart Settings Window Instance for {self.window_id} already exists, showing and bringing it to front")
+        self.chart_settings_window.show()
+        self.chart_settings_window.activateWindow()
 
     def toggleLock(self):
       self.window.drag_resize = not self.window.drag_resize
@@ -269,5 +283,5 @@ class Settings(QMainWindow):
     event.ignore() # ignore close event (would cause program to exit)
     if debug:
       logging.info("Closed Settings")
-    self.close_settings.emit()  # Emit custom signal
+    self.close_settings_signal.emit()  # Emit custom signal
     # super().closeEvent(event)
