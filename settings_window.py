@@ -7,6 +7,7 @@ import sys
 if 'nt' in sys.builtin_module_names:
   import winreg as reg
 import functools
+import logging
 
 # own files:
 from utils import resourcePath
@@ -20,7 +21,7 @@ class Settings(QMainWindow):
   def __init__(self, windows, parent=None):
     super().__init__(parent)
     if debug:
-      print("DEBUG: Creating Settings Object")
+      logging.info("Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
     self.setWindowIcon(QIcon(resourcePath("icon.png")))
@@ -72,8 +73,8 @@ class Settings(QMainWindow):
     # previous_new_id = None
     # for i, key in enumerate(settings.allKeys()):
     #   if key.startswith(f"window_"):
-    #     # print(key)
-    #     # print(int(re.findall(r"^window_(\d+)_[^_]+$", key)[0]))
+    #     # logging.info(key)
+    #     # logging.info(int(re.findall(r"^window_(\d+)_[^_]+$", key)[0]))
     #     value_variable = str(re.findall(r"^window_\d+_(.*)$", key)[0])
     #     key_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
     #     if not previous_old_id:
@@ -143,7 +144,7 @@ class Settings(QMainWindow):
       self.window.drag_resize = not self.window.drag_resize
       if self.window.drag_resize:
         if debug:
-          print(f"DEBUG: Unlocking Window with id {self.window_id}")
+          logging.info(f"Unlocking Window with id {self.window_id}")
         self.lock_button.setIcon(QIcon(resourcePath("unlocked.png")))
         self.window.showResizeGrips()
         self.window.positionGrips()
@@ -151,7 +152,7 @@ class Settings(QMainWindow):
         self.window.central_widget.setStyleSheet("QWidget#central_widget { border: 2px solid yellow; }") # yellow border to show unlocked status
       else:
         if debug:
-          print(f"DEBUG: Locking Window with id {self.window_id}")
+          logging.info(f"Locking Window with id {self.window_id}")
           self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
         else:
           self.window.central_widget.setStyleSheet("QWidget#central_widget { }") # remove border
@@ -165,17 +166,17 @@ class Settings(QMainWindow):
 
     def deleteChartWindow(self):
       if debug:
-        print(f"DEBUG: Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
+        logging.info(f"Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
       all_keys = settings.allKeys()
-      # print(all_keys)
+      # logging.info(all_keys)
       for key in all_keys:
         if key.startswith(self.window_id):
           if debug:
-            print(f"DEBUG: Removing {key} with value {settings.value(key)} from config")
+            logging.info(f"Removing {key} with value {settings.value(key)} from config")
           settings.remove(key)
       self.window.close()
       if debug:
-        print("DEBUG: Closed window")
+        logging.info("Closed window")
       # remove layout from settings window
       self.deleteLayout()
       # Remove the instance from settings_stock_layouts list
@@ -213,14 +214,14 @@ class Settings(QMainWindow):
         reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
         reg.CloseKey(open_key)
         if debug:
-          print(f"DEBUG: Successfully added to startup. Path: {app_path}")
+          logging.info(f"Successfully added to startup. Path: {app_path}")
       except Exception as e: # TODO Handle exception in gui
         if debug:
-          print(f"DEBUG: Failed to add to startup. Error: {str(e)}")
+          logging.info(f"Failed to add to startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to add to startup.")
     else:
       # if debug:
-        print("DEBUG: Not running .exe")
+        logging.info("Not running .exe")
 
   def disableLaunchOnStartup(self):
     if self.exeFilePath():
@@ -233,19 +234,19 @@ class Settings(QMainWindow):
         if reg.QueryValueEx(open_key, app_name):
           reg.DeleteValue(open_key, app_name)
           if debug:
-            print("DEBUG: Successfully removed from startup.")
+            logging.info("Successfully removed from startup.")
         else:
           if debug:
-            print("DEBUG: The registry value does not exist, nothing to remove.")
+            logging.info("The registry value does not exist, nothing to remove.")
 
         reg.CloseKey(open_key)
       except Exception as e:
         if debug:
-          print(f"DEBUG: Failed to remove from startup. Error: {str(e)}")
+          logging.info(f"Failed to remove from startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to remove from startup.")
     else:
       # if debug:
-        print("DEBUG: Not running .exe")
+        logging.info("Not running .exe")
 
   def exeFilePath(self):
     if getattr(sys, 'frozen', False):
@@ -267,6 +268,6 @@ class Settings(QMainWindow):
     self.destroy()
     event.ignore() # ignore close event (would cause program to exit)
     if debug:
-      print("DEBUG: Closed Settings")
+      logging.info("Closed Settings")
     self.close_settings.emit()  # Emit custom signal
     # super().closeEvent(event)

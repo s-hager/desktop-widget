@@ -1,0 +1,9 @@
+DEBUG: Start Creating Window with id 0
+DEBUG: Blurring Background...Done
+DEBUG: Downloading Stock Data...
+[*********************100%***********************]  1 of 1 completed
+DEBUG: Plotting Stock...Done
+DEBUG: Start Creating Window with id 0
+DEBUG: Blurring Background...Done
+DEBUG: Downloading Stock Data...
+[*********************100%***********************]  1 of 1 completed

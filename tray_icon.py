@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QIcon, QAction, QCursor
+import logging
 
 # own files:
 from settings_window import Settings
@@ -54,11 +55,11 @@ class TrayIcon:
   def clickHandler(self, reason):
     if reason == QSystemTrayIcon.ActivationReason.Trigger: # left click
       if debug:
-        print("DEBUG: Tray Icon was left clicked")
+        logging.info("Tray Icon was left clicked")
       self.showSettingsWindow()
     elif reason == QSystemTrayIcon.ActivationReason.Context: # right click
       if debug:
-        print("DEBUG: Tray Icon was right clicked")
+        logging.info("Tray Icon was right clicked")
       self.moveMenuToCursor()
 
   def moveMenuToCursor(self):
@@ -77,7 +78,7 @@ class TrayIcon:
     else:
       # If Settings Window is already open, bring it to the front of all windows
       if debug:
-        print("DEBUG: Settings Window Instance already exists, showing and bringing it to front")
+        logging.info("Settings Window Instance already exists, showing and bringing it to front")
       self.settings_window.show()
       self.settings_window.activateWindow()
       # QMessageBox.critical(self, "Error", "A Settings Window is already open.")

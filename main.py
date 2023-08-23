@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings,
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
 from BlurWindow.blurWindow import GlobalBlur
 import sys
+import signal
 import time
 import os
 import re
@@ -18,6 +19,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import logging
 
 import functools
 
@@ -45,19 +47,22 @@ from chart_window import ChartWindow # TODO: rewrite so this is not required her
 # base amount of y axis tick labels on window size
 # use createNewChartWindow also at startup
 
-if __name__ == '__main__':
+def main():
+  if log_to_file:
+    logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+  else:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+  global window_id_counter
   if debug:
-    print("DEBUG: Starting")
-  import sys
+    logging.info("Starting")
   # used to end app with ctrl + c
-  import signal
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
   if debug:
-    print("DEBUG: Creating Application...", end="")
+    logging.info("Creating Application...")
   app = QApplication(sys.argv)
   if debug:
-    print("Done")
+    logging.info("Done")
   # windows = [ChartWindow(), ChartWindow(), ChartWindow()]
   all_keys = settings.allKeys()
   for i, key in enumerate(all_keys):
@@ -68,14 +73,17 @@ if __name__ == '__main__':
         window_id_counter = window_id
       window = ChartWindow(window_symbol, window_id)
       if debug:
-        print(f"DEBUG: Showing Window with id {window_id}")
+        logging.info(f"Showing Window with id {window_id}")
       window.show()
       window.plotStock()
       windows.append(window)
   if debug:
-    print("Done")
-    print("DEBUG: Creating Tray Icon...", end="")
+    logging.info("Done")
+    logging.info("Creating Tray Icon...")
   tray_icon = TrayIcon(app, windows)
   if debug:
-    print("Done")
+    logging.info("Done")
   sys.exit(app.exec())
+
+if __name__ == '__main__':
+  main()

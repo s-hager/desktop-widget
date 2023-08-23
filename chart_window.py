@@ -11,6 +11,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import logging
 
 # own variables:
 from config import *
@@ -38,7 +39,7 @@ class ChartWindow(QMainWindow):
     window_id = window_id_counter
     self.value_to_highlight = 68.82
     if debug:
-      print(f"DEBUG: Start Creating Window with id {window_id}")
+      logging.info(f"Start Creating Window with id {window_id}")
     if window_id:
       self.window_id = f"window_{window_id}"
     else:
@@ -74,10 +75,10 @@ class ChartWindow(QMainWindow):
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
     if debug:
-      print("DEBUG: Blurring Background...", end="")
+      logging.info("Blurring Background...")
     self.blurBackground()
     if debug:
-      print("Done")
+      logging.info("Done")
     # self.roundCorners() # TODO
 
     # Create a Figure and Canvas for Matplotlib plot
@@ -172,7 +173,7 @@ class ChartWindow(QMainWindow):
 
   # def moveEvent(self, event):
   #   # This method is called when the window is moved
-  #   # print(f"Move Event on window {window_id}")
+  #   # logging.info(f"Move Event on window {window_id}")
   #   self.savePositionAndSize()
   #   super().moveEvent(event)
 
@@ -183,10 +184,10 @@ class ChartWindow(QMainWindow):
   def downloadStockData(self):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
     if debug:
-      print("DEBUG: Downloading Stock Data...")
-      self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    else:
-      self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+      logging.info("Downloading Stock Data...")
+      # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+    # else:
+    self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
     self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
@@ -217,7 +218,7 @@ class ChartWindow(QMainWindow):
   def updateRefreshTimeLabel(self):
     self.refresh_time_label.setText(self.update_time)
     if debug:
-      print(f"DEBUG: Updated Refresh Time to {self.update_time}")
+      logging.info(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
     if debug:
@@ -237,12 +238,12 @@ class ChartWindow(QMainWindow):
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
     if debug:
-      self.refresh_timer.timeout.connect(lambda: print("DEBUG: Refreshing Plot..."))
+      self.refresh_timer.timeout.connect(lambda: logging.info("Refreshing Plot..."))
     self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
     self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
     if debug:
-      self.refresh_timer.timeout.connect(lambda: print("Done"))
+      self.refresh_timer.timeout.connect(lambda: logging.info("Done"))
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
@@ -254,7 +255,7 @@ class ChartWindow(QMainWindow):
     else:
       self.plotStock() # replot stock to adjust to new window size
       if debug:
-        print(f"DEBUG: Resize Event")
+        logging.info(f"Resize Event")
     # QMainWindow.resizeEvent(self, event)
     if self.drag_resize:
       self.positionGrips()
@@ -282,7 +283,7 @@ class ChartWindow(QMainWindow):
     self.move(self.centered_position)
 
   def is_mouse_inside_grip(self, pos):
-    # print(pos)
+    # logging.info(pos)
     for grip in self.grips:
       if grip.geometry().contains(pos):
         return True
@@ -290,7 +291,7 @@ class ChartWindow(QMainWindow):
 
   def mousePressEvent(self, event):
     if drag_window or self.drag_resize:
-      # print("press")
+      # logging.info("press")
       self.candidate_start_position = event.globalPosition().toPoint()
       # if not self.is_mouse_inside_grip(self.candidate_start_position):
       if not self.is_mouse_inside_grip(event.pos()):
@@ -300,13 +301,13 @@ class ChartWindow(QMainWindow):
 
   def mouseReleaseEvent(self, event):
     if drag_window or self.drag_resize:
-      # print("release")
+      # logging.info("release")
       if event.button() == 1:  # Left mouse button
         self.drag_start_position = None
 
   def mouseMoveEvent(self, event):
     if drag_window or self.drag_resize:
-      # print("move")
+      # logging.info("move")
       if self.drag_start_position is not None and not self.is_mouse_inside_grip(self.drag_start_position):
         delta = QPoint(event.globalPosition().toPoint() - self.drag_start_position)
         self.move(self.x() + delta.x(), self.y() + delta.y())
@@ -331,14 +332,14 @@ class ChartWindow(QMainWindow):
       return formatted_date
 
     if debug:
-      print("DEBUG: Plotting Stock...", end="")
+      logging.info("Plotting Stock...")
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    # print(data.to_markdown())
-    # print(data)
+    # logging.info(data.to_markdown())
+    # logging.info(data)
 
-    # print(data['Datetime'])
+    # logging.info(data['Datetime'])
 
     # So that days where no market activity took place are omitted instead of drawn as a straight line 
     formatter = CustomFormatter(self.data['Datetime'])
@@ -439,4 +440,4 @@ class ChartWindow(QMainWindow):
     # Refresh the canvas to update the plot
     self.canvas.draw()
     if debug:
-      print("Done")
+      logging.info("Done")
