@@ -50,23 +50,21 @@ from chart_window import ChartWindow # TODO: rewrite so this is not required her
 # fix program behaviour when monitor is connected/disconnected
 
 def main():
-  if log_to_file:
-    logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
-    # logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
-  else:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
-    # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
-  global window_id_counter
   if debug:
-    logging.info("Starting")
+    if log_to_file:
+      logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+      # logging.basicConfig(filename="stockwidget.log", filemode="w", level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
+    else:
+      logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+      # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
+  global window_id_counter
+  logging.info("Starting")
   # used to end app with ctrl + c
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-  if debug:
-    logging.info("Creating Application...")
+  logging.info("Creating Application...")
   app = QApplication(sys.argv)
-  if debug:
-    logging.info("Done")
+  logging.info("Done Creating Application")
   # windows = [ChartWindow(), ChartWindow(), ChartWindow()]
   all_keys = settings.allKeys()
   for i, key in enumerate(all_keys):
@@ -76,17 +74,15 @@ def main():
       if window_id > window_id_counter:
         window_id_counter = window_id
       window = ChartWindow(window_symbol, window_id)
-      if debug:
-        logging.info(f"Showing Window with id {window_id}")
+      logging.info(f"Showing Window with id {window_id}")
+      window.applyConfig() # load windows' settings from config
       window.show()
       window.plotStock()
       windows.append(window)
-  if debug:
-    logging.info("Done")
-    logging.info("Creating Tray Icon...")
+  logging.info("Done Showing all windows")
+  logging.info("Creating Tray Icon...")
   tray_icon = TrayIcon(app, windows)
-  if debug:
-    logging.info("Done")
+  logging.info("Done Creating Tray Icon")
   sys.exit(app.exec())
 
 if __name__ == '__main__':

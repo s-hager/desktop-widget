@@ -37,11 +37,12 @@ class ChartWindow(QMainWindow):
     self.first_resize = True
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
+    self.bought_line = False
     if not window_id:
       window_id = window_id_counter
-    self.value_to_highlight = 68.82
-    if debug:
-      logging.info(f"Start Creating Window with id {window_id}")
+    # self.value_to_highlight = 68.82
+    self.value_to_highlight = 0
+    logging.info(f"Start Creating Window with id {window_id}")
     if window_id:
       self.window_id = f"window_{window_id}"
     else:
@@ -76,11 +77,9 @@ class ChartWindow(QMainWindow):
     self.setWindowTitle(f"{self.window_id}")
     self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
-    if debug:
-      logging.info("Blurring Background...")
+    logging.info("Blurring Background...")
     self.blurBackground()
-    if debug:
-      logging.info("Done")
+    logging.info("Done Blurring Background")
     # self.roundCorners() # TODO
 
     # Create a Figure and Canvas for Matplotlib plot
@@ -153,6 +152,16 @@ class ChartWindow(QMainWindow):
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
+  def applyConfig(self):
+    logging.info(f"Applying config to {self.window_id}")
+    if settings.value(f"{self.window_id}_bought_line", type=bool):
+      self.value_to_highlight = float(settings.value(f"{self.window_id}_bought_line_value"))
+      self.bought_line = True
+
+  def setBoughtLine(self, state):
+    self.bought_line = state
+    self.plotStock()
+
   def addResizeGrips(self):
     # Add resize grips
     self.gripSize = 16
@@ -185,8 +194,7 @@ class ChartWindow(QMainWindow):
 
   def downloadStockData(self):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-    if debug:
-      logging.info("Downloading Stock Data...")
+    logging.info("Downloading Stock Data...")
       # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # else:
     while True:
@@ -226,8 +234,7 @@ class ChartWindow(QMainWindow):
 
   def updateRefreshTimeLabel(self):
     self.refresh_time_label.setText(self.update_time)
-    if debug:
-      logging.info(f"Updated Refresh Time to {self.update_time}")
+    logging.info(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
     if debug:
@@ -246,13 +253,11 @@ class ChartWindow(QMainWindow):
     # Create a QTimer object
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
-    if debug:
-      self.refresh_timer.timeout.connect(lambda: logging.info("Refreshing Plot..."))
+    self.refresh_timer.timeout.connect(lambda: logging.info("Refreshing Plot..."))
     self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
     self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
-    if debug:
-      self.refresh_timer.timeout.connect(lambda: logging.info("Done"))
+    self.refresh_timer.timeout.connect(lambda: logging.info("Done"))
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
@@ -263,8 +268,7 @@ class ChartWindow(QMainWindow):
       return
     else:
       self.plotStock() # replot stock to adjust to new window size
-      if debug:
-        logging.info(f"Resize Event")
+      logging.info(f"Resize Event")
     # QMainWindow.resizeEvent(self, event)
     if self.drag_resize:
       self.positionGrips()
@@ -340,8 +344,7 @@ class ChartWindow(QMainWindow):
       formatted_date = dt_obj.strftime("%B %d")
       return formatted_date
 
-    if debug:
-      logging.info("Plotting Stock...")
+    logging.info("Plotting Stock...")
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -372,10 +375,6 @@ class ChartWindow(QMainWindow):
         ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_negative, alpha=0.3, zorder=-1)
       else:
         ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_positive, alpha=0.3, zorder=-1)
-
-    if bought_line:
-      ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
-      ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
 
     # Customize the plot
     # ax.set_xlabel('Date', color='white', fontsize=10)
@@ -420,6 +419,25 @@ class ChartWindow(QMainWindow):
     padding = padding_multiplier * (ymax - ymin)
     ax.set_ylim(ymin - padding, ymax + padding)
 
+    if self.bought_line:
+      # if line would not be visible (value too small or large) display it at bottom or top of visible plot
+      y_min, y_max = ax.get_ylim()
+      if self.value_to_highlight < y_min:
+        # offset because line is being drawn just below value and would be outside of plot otherwise (not appear)
+        # offset = 0.01 * (y_max - y_min)
+        # ax.axhline(y=y_min + offset, color='yellow', linewidth=1)
+        # ax.scatter(0, y_min + offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+        # line_width_offset tries to only offset 1 pixel (the bought lines' width, wheras offset takes 1% of entire data)
+        line_width_offset = 1 / (ax.transData.transform([0, 1])[1] - ax.transData.transform([0, 0])[1])
+        ax.axhline(y=y_min + line_width_offset, color='yellow', linewidth=1)
+        ax.scatter(0, y_min + line_width_offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+      elif self.value_to_highlight > y_max:
+        ax.axhline(y=y_max, color='yellow', linewidth=1)
+        ax.scatter(0, y_max, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+      else:
+        ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
+        ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+
     if monday_lines:
       formatted_dates = [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]]
       # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
@@ -448,5 +466,4 @@ class ChartWindow(QMainWindow):
     # plt.autoscale(axis='x')
     # Refresh the canvas to update the plot
     self.canvas.draw()
-    if debug:
-      logging.info("Done")
+    logging.info("Done Plotting Stock")

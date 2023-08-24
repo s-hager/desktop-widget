@@ -53,18 +53,15 @@ class TrayIcon:
     self.tray_icon.show()
 
   def quitApp(self):
-    if debug:
-      logging.info("Quitting Application")
+    logging.info("Quitting Application")
     QCoreApplication.quit()
 
   def clickHandler(self, reason):
     if reason == QSystemTrayIcon.ActivationReason.Trigger: # left click
-      if debug:
-        logging.info("Tray Icon was left clicked")
+      logging.info("Tray Icon was left clicked")
       self.openSettingsWindow()
     elif reason == QSystemTrayIcon.ActivationReason.Context: # right click
-      if debug:
-        logging.info("Tray Icon was right clicked")
+      logging.info("Tray Icon was right clicked")
       self.moveMenuToCursor()
 
   def moveMenuToCursor(self):
@@ -82,8 +79,7 @@ class TrayIcon:
       self.settings_window.activateWindow()
     else:
       # If Settings Window is already open, bring it to the front of all windows
-      if debug:
-        logging.info("Settings Window Instance already exists, showing and bringing it to front")
+      logging.info("Settings Window Instance already exists, showing and bringing it to front")
       self.settings_window.show()
       self.settings_window.activateWindow()
       # QMessageBox.critical(self, "Error", "A Settings Window is already open.")

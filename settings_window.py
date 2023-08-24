@@ -21,8 +21,7 @@ class SettingsWindow(QMainWindow):
   close_settings_signal = pyqtSignal()
   def __init__(self, windows, parent=None):
     super().__init__(parent)
-    if debug:
-      logging.info("Creating Settings Object")
+    logging.info("Creating Settings Object")
     self.windows = windows
     self.setWindowTitle("Settings")
     self.setWindowIcon(QIcon(app_icon))
@@ -45,7 +44,7 @@ class SettingsWindow(QMainWindow):
     launch_on_startup_stored_value = settings.value("launch_on_startup", False, type=bool)
 
     self.launch_on_startup_checkbox.setChecked(launch_on_startup_stored_value)
-    self.launch_on_startup_checkbox.clicked.connect(self.launchOnStartupChanged)
+    self.launch_on_startup_checkbox.clicked.connect(self.toggleLaunchOnStartup)
     self.layout.addWidget(self.launch_on_startup_checkbox)
 
     self.settings_stock_layouts = []
@@ -144,29 +143,28 @@ class SettingsWindow(QMainWindow):
 
     def openChartSettingsWindow(self):
       if self.chart_settings_window is None:
-        self.chart_settings_window = ChartSettingsWindow(self, self.window)
+        self.chart_settings_window = ChartSettingsWindow(self.window)
+        self.chart_settings_window.close_chart_settings_signal.connect(self.clearChartSettingsWindowReference)
         self.chart_settings_window.show()
         self.chart_settings_window.activateWindow()
       else:
         # If Window is already open, bring it to the front of all windows
-        if debug:
-          logging.info(f"Chart Settings Window Instance for {self.window_id} already exists, showing and bringing it to front")
+        logging.info(f"Chart Settings Window Instance for {self.window_id} already exists, showing and bringing it to front")
         self.chart_settings_window.show()
         self.chart_settings_window.activateWindow()
 
     def toggleLock(self):
       self.window.drag_resize = not self.window.drag_resize
       if self.window.drag_resize:
-        if debug:
-          logging.info(f"Unlocking Window with id {self.window_id}")
+        logging.info(f"Unlocking Window with id {self.window_id}")
         self.lock_button.setIcon(QIcon(resourcePath("unlocked.png")))
         self.window.showResizeGrips()
         self.window.positionGrips()
         self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
         self.window.central_widget.setStyleSheet("QWidget#central_widget { border: 2px solid yellow; }") # yellow border to show unlocked status
       else:
+        logging.info(f"Locking Window with id {self.window_id}")
         if debug:
-          logging.info(f"Locking Window with id {self.window_id}")
           self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
         else:
           self.window.central_widget.setStyleSheet("QWidget#central_widget { }") # remove border
@@ -179,18 +177,15 @@ class SettingsWindow(QMainWindow):
       return self.window_layout
 
     def deleteChartWindow(self):
-      if debug:
-        logging.info(f"Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
+      logging.info(f"Deleting window {self.window_id} with symbol {self.window.stock_symbol}")
       all_keys = settings.allKeys()
       # logging.info(all_keys)
       for key in all_keys:
         if key.startswith(self.window_id):
-          if debug:
-            logging.info(f"Removing {key} with value {settings.value(key)} from config")
+          logging.info(f"Removing {key} with value {settings.value(key)} from config")
           settings.remove(key)
       self.window.close()
-      if debug:
-        logging.info("Closed window")
+      logging.info("Closed window")
       # remove layout from settings window
       self.deleteLayout()
       # Remove the instance from settings_stock_layouts list
@@ -208,7 +203,7 @@ class SettingsWindow(QMainWindow):
       # Delete the layout itself
       self.window_layout.deleteLater()
 
-  def launchOnStartupChanged(self, state):
+  def toggleLaunchOnStartup(self, state):
     # TODO save state
     settings.setValue("launch_on_startup", state)
 
@@ -227,15 +222,12 @@ class SettingsWindow(QMainWindow):
         open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
         reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
         reg.CloseKey(open_key)
-        if debug:
-          logging.info(f"Successfully added to startup. Path: {app_path}")
+        logging.info(f"Successfully added to startup. Path: {app_path}")
       except Exception as e: # TODO Handle exception in gui
-        if debug:
-          logging.info(f"Failed to add to startup. Error: {str(e)}")
+        logging.info(f"Failed to add to startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to add to startup.")
     else:
-      # if debug:
-        logging.info("Not running .exe")
+      logging.info("Not running .exe")
 
   def disableLaunchOnStartup(self):
     if self.exeFilePath():
@@ -247,20 +239,16 @@ class SettingsWindow(QMainWindow):
         # Delete the registry value if it exists
         if reg.QueryValueEx(open_key, app_name):
           reg.DeleteValue(open_key, app_name)
-          if debug:
-            logging.info("Successfully removed from startup.")
+          logging.info("Successfully removed from startup.")
         else:
-          if debug:
-            logging.info("The registry value does not exist, nothing to remove.")
+          logging.info("The registry value does not exist, nothing to remove.")
 
         reg.CloseKey(open_key)
       except Exception as e:
-        if debug:
-          logging.info(f"Failed to remove from startup. Error: {str(e)}")
+        logging.info(f"Failed to remove from startup. Error: {str(e)}")
         QMessageBox.critical(self, "Error", "Failed to remove from startup.")
     else:
-      # if debug:
-        logging.info("Not running .exe")
+      logging.info("Not running .exe")
 
   def exeFilePath(self):
     if getattr(sys, 'frozen', False):
@@ -281,7 +269,6 @@ class SettingsWindow(QMainWindow):
     # self.hide()
     self.destroy()
     event.ignore() # ignore close event (would cause program to exit)
-    if debug:
-      logging.info("Closed Settings")
+    logging.info("Closed Settings")
     self.close_settings_signal.emit()  # Emit custom signal
     # super().closeEvent(event)
