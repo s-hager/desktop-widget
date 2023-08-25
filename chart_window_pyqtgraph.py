@@ -72,7 +72,17 @@ class ChartWindow(QMainWindow):
     self.graphWidget = pg.PlotWidget()
     self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     self.graphWidget.setBackground(pg.mkColor(0, 0, 0, 0))
-    # self.graphWidget.patch.set_alpha(0)
+    
+    # https://stackoverflow.com/questions/38795508/autoranging-plotwidget-without-padding-pyqtgraph
+    # https://stackoverflow.com/a/65545219
+    # pg.ViewBox.suggestPadding = lambda *_: 0.0
+
+    self.view_box = pg.ViewBox()
+    # print(self.view_box.suggestPadding(self))
+    # self.view_box.setDefaultPadding(0.0)
+    # print(self.view_box.suggestPadding(self))
+    # self.view_box.autoRange(padding=0)
+    # self.view_box.enableAutoRange()
     # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
     self.plotItem = self.graphWidget.plotItem
@@ -350,6 +360,25 @@ class ChartWindow(QMainWindow):
     self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=(255, 0, 0), width=1))
     
     # Customize plot appearance
+    self.graphWidget.showGrid(x=True, y=True)
+
+    # yMax = max(self.data['Close'])
+    # print(yMax)
+    # print(len(self.data['Close']))
+    # existingViewRect = self.graphWidget.plotItem.getViewBox().viewRange()
+    # print(existingViewRect)
+    # print(existingViewRect[0][1])
+    # yMaxInView = existingViewRect[1][1]
+    # print(yMax)
+    # print(yMaxInView)
+    # if (yMax < 80):
+    #     self.graphWidget.setYRange(15, 22, padding=0)
+    # elif yMax > yMaxInView:
+    #     self.graphWidget.setYRange(0, 2*yMaxInView, padding=0)
+    # elif (yMax < yMaxInView/2):
+    #     self.graphWidget.setYRange(0, yMaxInView/2, padding=0)
+    max_x_value = len(self.data['Close'])
+    self.graphWidget.setXRange(0, max_x_value, padding=0)
     # self.plotItem.setLabel('bottom', 'Datetime')
     # self.plotItem.setLabel('left', 'Stock Price')
     # self.plotItem.getAxis('bottom').setTickSpacing(1, 0.1)  # Customize x-axis tick spacing
