@@ -11,7 +11,8 @@ import logging
 
 # own files:
 from utils import resourcePath
-from chart_window import ChartWindow
+# from chart_window import ChartWindow
+from chart_window_pyqtgraph import ChartWindow
 from chart_settings_window import ChartSettingsWindow
 # own variables:
 from config import *

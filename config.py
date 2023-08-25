@@ -27,6 +27,6 @@ refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
 log_to_file = False
-debug = False # set to False for pyinstaller
-# debug = True # set to False for pyinstaller
+# debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###
