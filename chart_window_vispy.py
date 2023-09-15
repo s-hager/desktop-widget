@@ -66,10 +66,7 @@ class ChartWindow(QMainWindow):
     logging.info("Done Blurring Background")
     # self.roundCorners() # TODO
 
-    fig = vp.Fig(show=True)
-    self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0)
-    # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
+    self.fig = vp.plot()
     
     self.downloadStockData()
 
@@ -315,5 +312,6 @@ class ChartWindow(QMainWindow):
 
   def plotStock(self):
     logging.info("Plotting Stock...")
-    
+    self.fig.plot(self.data['Close'], self.data['Datetime'])
+    self.fig.show()
     logging.info("Done Plotting Stock")

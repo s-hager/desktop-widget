@@ -27,7 +27,7 @@ import functools
 from config import *
 from constants import *
 from tray_icon import TrayIcon
-from chart_window import ChartWindow # TODO: rewrite so this is not required here
+from chart_window_vispy import ChartWindow # TODO: rewrite so this is not required here
 
 ## TODO
 # remove space from left and right of graph
