@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QCheckBox, QLineEdit, QDialog, QMessageBox
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QCheckBox, QLineEdit, QDialog, QMessageBox, QPushButton
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSignal
 import logging
@@ -19,16 +19,20 @@ class ChartSettingsWindow(QDialog):
     layout = QVBoxLayout()
 
     self.bought_line = QHBoxLayout()
-    self.bought_line_value = QLineEdit(self)
-    self.bought_line_value.setPlaceholderText("Bought Line Value e.g. 56.78")
+    self.bought_line_raw_value = QLineEdit(self)
+    self.bought_line_raw_value.setPlaceholderText("Bought Line Value e.g. 56.78")
+    self.bought_line_update = QPushButton(self)
+    self.bought_line_update.setText("Update")
+    self.bought_line_update.clicked.connect(self.updateBoughtLineValue)
     self.bought_line_checkbox = QCheckBox("Show \"Bought\" Line")
     self.bought_line_checkbox.clicked.connect(self.toggleBoughtLine)
-    self.bought_line.addWidget(self.bought_line_value)
+    self.bought_line.addWidget(self.bought_line_raw_value)
+    self.bought_line.addWidget(self.bought_line_update)
     self.bought_line.addWidget(self.bought_line_checkbox)
     # display current values if bought line is activated
     if self.window.bought_line:
       self.bought_line_checkbox.setChecked(True)
-      self.bought_line_value.setText(f"{self.window.value_to_highlight}")
+      self.bought_line_raw_value.setText(f"{self.window.value_to_highlight}")
     layout.addLayout(self.bought_line)
 
     self.placeholder = QHBoxLayout()
@@ -41,24 +45,35 @@ class ChartSettingsWindow(QDialog):
 
     self.setLayout(layout)
 
+  def checkBoughtLineValue(self):
+    self.bought_line_value = self.bought_line_raw_value.text().strip()
+    if not self.bought_line_value:
+      QMessageBox.critical(self, "Error", "Bought Line Value cannot be empty.")
+      self.bought_line_checkbox.setChecked(False)
+      return False
+    else:
+      try:
+        self.bought_line_value = float(self.bought_line_value)
+      except ValueError:
+        QMessageBox.critical(self, "Error", "Bought Line Value has to be floating point number.")
+        self.bought_line_checkbox.setChecked(False)
+        self.bought_line_value.clear()
+        return False
+    return True
+
+  def updateBoughtLineValue(self):
+    if self.checkBoughtLineValue():
+      self.window.value_to_highlight = self.bought_line_value
+      settings.setValue(f"{self.window_id}_bought_line_value", self.bought_line_value)
+      self.window.setBoughtLine(True)
+      logging.info(f"Updated Bought Line Value for {self.window_id}")
+
   def toggleBoughtLine(self, state):
     if state: # if checkbox was set to checked
-      bought_line_value = self.bought_line_value.text().strip()
-      if not bought_line_value:
-        QMessageBox.critical(self, "Error", "Bought Line Value cannot be empty.")
-        self.bought_line_checkbox.setChecked(False)
-        return
-      else:
-        try:
-          bought_line_value = float(bought_line_value)
-        except ValueError:
-          QMessageBox.critical(self, "Error", "Bought Line Value has to be floating point number.")
-          self.bought_line_checkbox.setChecked(False)
-          self.bought_line_value.clear()
-          return
-        logging.info(f"Enable bought line at {bought_line_value} for {self.window_id}")
-        self.window.value_to_highlight = bought_line_value
-        settings.setValue(f"{self.window_id}_bought_line_value", bought_line_value)
+      if self.checkBoughtLineValue():
+        logging.info(f"Enable bought line at {self.bought_line_value} for {self.window_id}")
+        self.window.value_to_highlight = self.bought_line_value
+        settings.setValue(f"{self.window_id}_bought_line_value", self.bought_line_value)
     else:
       logging.info(f"Disable bought line for {self.window_id}")
       settings.remove(f"{self.window_id}_bought_line_value")
