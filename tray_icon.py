@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
-from PyQt6.QtCore import QCoreApplication, QThread
+from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QIcon, QAction, QCursor
 import logging
 import re
