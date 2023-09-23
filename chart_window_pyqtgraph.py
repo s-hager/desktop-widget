@@ -361,6 +361,12 @@ class ChartWindow(QMainWindow):
     
     # Customize plot appearance
     self.graphWidget.showGrid(x=True, y=True)
+    self.graphWidget.getAxis('left').setGrid(False)
+    self.graphWidget.getAxis('bottom').setGrid(False)
+
+    for key in ['right', 'top']:
+      self.graphWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
+      self.graphWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
 
     # yMax = max(self.data['Close'])
     # print(yMax)

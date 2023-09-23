@@ -30,3 +30,6 @@ Autostart adds windows registry key to
 ```Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run```
 
 if running as .exe
+
+### fix pyqtgraph cutting off tick labels:
+https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-showgrid-is-called
