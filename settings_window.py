@@ -19,10 +19,10 @@ from constants import *
 
 class SettingsWindow(QMainWindow):
   close_settings_signal = pyqtSignal()
-  def __init__(self, windows, parent=None):
+  def __init__(self, tray_icon, parent=None):
     super().__init__(parent)
     logging.info("Creating Settings Object")
-    self.windows = windows
+    self.tray_icon = tray_icon
     self.setWindowTitle("Settings")
     self.setWindowIcon(QIcon(app_icon))
     # self.setGeometry(100, 100, 300, 200)
@@ -63,7 +63,7 @@ class SettingsWindow(QMainWindow):
 
   def addOpenWindows(self):
     # self.clearLayout(self.window_layout)
-    for window in self.windows:
+    for window in self.tray_icon.windows:
       # Add the QHBoxLayout for this window to the main QVBoxLayout
       new_settings_stock_object = self.SettingsStockLayout(self, window)
       self.settings_stock_layouts.append(new_settings_stock_object)
@@ -85,7 +85,6 @@ class SettingsWindow(QMainWindow):
     #       settings.setValue(f"window_{previous_new_id}_{value_variable}", settings.value)
 
   def createNewChartWindow(self):
-    global window_id_counter
     # self.clearLayout(self.window_layout)
     # self.addOpenWindows()
     stock_symbol = self.textbox.text().strip().upper()
@@ -93,13 +92,13 @@ class SettingsWindow(QMainWindow):
       QMessageBox.critical(self, "Error", "Stock Symbol cannot be empty.")
     else:
       self.textbox.clear() # clear user input from textbox
-      window_id = window_id_counter
+      self.tray_icon.window_id_counter += 1
+      window_id = self.tray_icon.window_id_counter
       settings.setValue(f"window_{window_id}_symbol", stock_symbol)
-      window_id_counter += 1
-      new_window = ChartWindow(stock_symbol)
+      new_window = ChartWindow(self.tray_icon, stock_symbol, window_id)
       new_window.show()
       new_window.plotStock()
-      windows.append(new_window)
+      self.tray_icon.windows.append(new_window)
       new_settings_stock_object = self.SettingsStockLayout(self, new_window)
       self.settings_stock_layouts.append(new_settings_stock_object)
       self.layout.addLayout(new_settings_stock_object.getLayout())

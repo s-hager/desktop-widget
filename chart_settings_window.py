@@ -66,6 +66,7 @@ class ChartSettingsWindow(QDialog):
       self.window.value_to_highlight = self.bought_line_value
       settings.setValue(f"{self.window_id}_bought_line_value", self.bought_line_value)
       self.window.setBoughtLine(True)
+      self.bought_line_checkbox.setChecked(True)
       logging.info(f"Updated Bought Line Value for {self.window_id}")
 
   def toggleBoughtLine(self, state):

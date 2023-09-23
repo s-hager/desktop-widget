@@ -23,10 +23,11 @@ title_font_size = 20
 update_font_size = 8
 drag_window = False
 display_refresh_time = True
+retries = 5
 refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
 log_to_file = False
-debug = False # set to False for pyinstaller
-# debug = True # set to False for pyinstaller
+# debug = False # set to False for pyinstaller
+debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###

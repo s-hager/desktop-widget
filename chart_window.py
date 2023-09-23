@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
-                             QVBoxLayout, QSizePolicy)
+                             QVBoxLayout, QSizePolicy, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer
 from PyQt6.QtGui import QGuiApplication, QFont
 from BlurWindow.blurWindow import GlobalBlur
@@ -32,21 +32,21 @@ class CustomFormatter(Formatter):
     return self.dates[index].strftime(self.format)
 
 class ChartWindow(QMainWindow):
-  def __init__(self, stock_symbol, window_id=None):
+  def __init__(self, tray_icon, stock_symbol, window_id):
     super(ChartWindow, self).__init__(parent=None)
+    self.tray_icon = tray_icon
     self.first_resize = True
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
     self.bought_line = False
-    if not window_id:
-      window_id = window_id_counter
     # self.value_to_highlight = 68.82
     self.value_to_highlight = 0
     logging.info(f"Start Creating Window with id {window_id}")
-    if window_id:
-      self.window_id = f"window_{window_id}"
-    else:
-      self.window_id = f"window_{window_id}"
+    self.window_id = f"window_{window_id}"
+    # if window_id:
+    #   self.window_id = f"window_{window_id}"
+    # else:
+    #   self.window_id = f"window_{window_id}"
     # Call move with an invalid position to prevent default positioning
     # self.move(-1000, -1000)
 
@@ -197,7 +197,8 @@ class ChartWindow(QMainWindow):
     logging.info("Downloading Stock Data...")
       # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # else:
-    while True:
+    try_counter = 0
+    while try_counter < retries:
       try:
         self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
         self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -206,8 +207,13 @@ class ChartWindow(QMainWindow):
         break
       except Exception as e:
         logging.info(f"An exception occured: {e}")
-        logging.info("Retrying in 5 seconds...")
+        logging.info(f"Download Attempt {try_counter + 1} failed.")
+        logging.info("Retrying in 1 second...")
         time.sleep(1)
+      try_counter += 1
+    if try_counter == retries:
+      QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
+      logging.info("Could not download stock data after 5 tries.")
 
   def replaceCurrencySymbols(self, text):
     currency_symbols = {
