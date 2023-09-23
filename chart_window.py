@@ -3,10 +3,12 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidg
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer
 from PyQt6.QtGui import QGuiApplication, QFont
 from BlurWindow.blurWindow import GlobalBlur
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.ticker import Formatter, FixedLocator
+# import matplotlib.pyplot as plt
+# import matplotlib.ticker as ticker
+# from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.ticker import Formatter, FixedLocator
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtGui, QtCore
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -19,17 +21,17 @@ from config import *
 from constants import *
 
 # https://stackoverflow.com/questions/54277905/how-to-disable-date-interpolation-in-matplotlib
-class CustomFormatter(Formatter):
-  def __init__(self, dates, format='%Y-%m-%d %H:%M:%S-%H:%M'):
-    self.dates = dates
-    self.format = format
+# class CustomFormatter(Formatter):
+#   def __init__(self, dates, format='%Y-%m-%d %H:%M:%S-%H:%M'):
+#     self.dates = dates
+#     self.format = format
 
-  def __call__(self, x, pos=0):
-    'Return the label for time x at position pos'
-    index = int(np.round(x))
-    if index >= len(self.dates) or index < 0:
-      return ''
-    return self.dates[index].strftime(self.format)
+#   def __call__(self, x, pos=0):
+#     'Return the label for time x at position pos'
+#     index = int(np.round(x))
+#     if index >= len(self.dates) or index < 0:
+#       return ''
+#     return self.dates[index].strftime(self.format)
 
 class ChartWindow(QMainWindow):
   def __init__(self, tray_icon, stock_symbol, window_id):
@@ -82,16 +84,35 @@ class ChartWindow(QMainWindow):
     logging.info("Done Blurring Background")
     # self.roundCorners() # TODO
 
-    # Create a Figure and Canvas for Matplotlib plot
-    if debug:
-      self.figure = plt.figure(facecolor='blue')
-    else:
-      self.figure = plt.figure()
-    # self.figure.tight_layout(pad=0.1)
-    self.canvas = FigureCanvas(self.figure)
-    self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.figure.patch.set_alpha(0)
+    # Create plot
+    self.graphWidget = pg.PlotWidget()
+    self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    self.graphWidget.setBackground(pg.mkColor(0, 0, 0, 0))
+    
+    # https://stackoverflow.com/questions/38795508/autoranging-plotwidget-without-padding-pyqtgraph
+    # https://stackoverflow.com/a/65545219
+    # pg.ViewBox.suggestPadding = lambda *_: 0.0
+
+    self.view_box = pg.ViewBox()
+    # print(self.view_box.suggestPadding(self))
+    # self.view_box.setDefaultPadding(0.0)
+    # print(self.view_box.suggestPadding(self))
+    # self.view_box.autoRange(padding=0)
+    # self.view_box.enableAutoRange()
     # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
+    
+    self.plotItem = self.graphWidget.plotItem
+
+    # # Create a Figure and Canvas for Matplotlib plot
+    # if debug:
+    #   self.figure = plt.figure(facecolor='blue')
+    # else:
+    #   self.figure = plt.figure()
+    # # self.figure.tight_layout(pad=0.1)
+    # self.canvas = FigureCanvas(self.figure)
+    # self.canvas.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    # self.figure.patch.set_alpha(0)
+    # # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
     self.downloadStockData()
 
@@ -102,14 +123,16 @@ class ChartWindow(QMainWindow):
 
     self.title_widget = self.titleWidget()
     self.title_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-    self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    # self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    self.graphWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     
     # Call the method to plot the stock graph on the canvas
     # self.plotStock()
 
     layout = QVBoxLayout()
     layout.addWidget(self.title_widget)
-    layout.addWidget(self.canvas)
+    # layout.addWidget(self.canvas)
+    layout.addWidget(self.graphWidget)
     if display_refresh_time:
       layout.addWidget(self.refreshTimeLabel())
     layout.setSpacing(0)
@@ -124,7 +147,8 @@ class ChartWindow(QMainWindow):
     if debug:
       self.central_widget.setStyleSheet("border: 1px solid red;")
 
-    self.canvas.installEventFilter(self)
+    # self.canvas.installEventFilter(self)
+    self.graphWidget.installEventFilter(self)
 
     self.addResizeGrips()
     self.startRefreshTimer()
@@ -351,6 +375,53 @@ class ChartWindow(QMainWindow):
       return formatted_date
 
     logging.info("Plotting Stock...")
+    # Clear the existing plot
+    self.plotItem.clear()
+
+    # Plot the stock data
+    x = np.arange(len(self.data['Datetime']))
+    y = self.data['Close']
+    
+    # Customize plot appearance
+    self.graphWidget.showGrid(x=True, y=True)
+    self.graphWidget.getAxis('left').setGrid(False)
+    self.graphWidget.getAxis('bottom').setGrid(False)
+
+    # check if oldest close value is smaller or bigger than newest close value
+    positive_chart = None
+    if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+      positive_chart = True
+    else:
+      positive_chart = False
+
+    # Conditional Line Color
+    if positive_chart:
+        chart_line_color = chart_line_color_negative
+        chart_area_color = chart_area_color_negative
+    else:
+        chart_line_color = chart_line_color_positive
+        chart_area_color = chart_area_color_positive
+
+
+    # Fill the area below the stock price line with a color
+    if area_chart:
+      # TODO: the y "limits" are not being set correctly
+      # line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=100, brush=chart_area_color)
+      line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
+    else:
+      line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
+
+    # https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-showgrid-is-called
+    for key in ['right', 'top']:
+      self.graphWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
+      self.graphWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
+    
+    max_x_value = len(self.data['Close'])
+    self.graphWidget.setXRange(0, max_x_value, padding=0)
+
+    # Refresh the graph
+    self.graphWidget.update()
+
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # data = yf.download(stock, interval="5m", period="1wk", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
@@ -360,116 +431,116 @@ class ChartWindow(QMainWindow):
     # logging.info(data['Datetime'])
 
     # So that days where no market activity took place are omitted instead of drawn as a straight line 
-    formatter = CustomFormatter(self.data['Datetime'])
+    # formatter = CustomFormatter(self.data['Datetime'])
 
-    # Clear the existing plot
-    self.figure.clear()
+    # # Clear the existing plot
+    # self.figure.clear()
 
-    # Create a subplot and plot the stock data
-    ax = self.figure.add_subplot(111)
-    ax.xaxis.set_major_formatter(formatter)
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(self.format_y_tick_label))
-    if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
-      self.data['Close'].plot(ax=ax, color=chart_line_color_negative)
-    else:
-      self.data['Close'].plot(ax=ax, color=chart_line_color_positive)
-    self.figure.set_tight_layout({'pad': 0.1}) # TODO 0.1 otherwise right border is not visible
-
-    # Fill the area below the stock price line with a color
-    if area_chart:
-      if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
-        ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_negative, alpha=0.3, zorder=-1)
-      else:
-        ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_positive, alpha=0.3, zorder=-1)
-
-    # Customize the plot
-    # ax.set_xlabel('Date', color='white', fontsize=10)
-    # ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
-    # ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
-    # if debug:
-    #   ax.set_facecolor('yellow')
+    # # Create a subplot and plot the stock data
+    # ax = self.figure.add_subplot(111)
+    # ax.xaxis.set_major_formatter(formatter)
+    # ax.yaxis.set_major_formatter(ticker.FuncFormatter(self.format_y_tick_label))
+    # if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+    #   self.data['Close'].plot(ax=ax, color=chart_line_color_negative)
     # else:
-    ax.set_facecolor('none')
+    #   self.data['Close'].plot(ax=ax, color=chart_line_color_positive)
+    # self.figure.set_tight_layout({'pad': 0.1}) # TODO 0.1 otherwise right border is not visible
 
-    ax.tick_params(which='minor', size=0)
-    ax.tick_params(color=legend_color, labelcolor=legend_color)
-    ax.tick_params(left = False, bottom = False)
-    ax.tick_params(axis='x', which='major', labelsize=8, pad=0)
-    ax.tick_params(axis='y', which='major', labelsize=8, pad=0)
-    # Remove left and right margins
-    ax.margins(x=0)
-    # Remove graph frame (borders)
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['right'].set_visible(False)
-    # ax.spines['bottom'].set_visible(False)
-    # ax.spines['left'].set_visible(False)
-    # ax.spines['top'].set_color(legend_color)
-    # ax.spines['right'].set_color(legend_color)
-    # ax.spines['bottom'].set_color(legend_color)
-    # ax.spines['left'].set_color(legend_color)
-    # ax.spines['top'].set_alpha(0.5)
-    # ax.spines['right'].set_alpha(0.5)
-    # ax.spines['bottom'].set_alpha(0.5)
-    # ax.spines['left'].set_alpha(0.5)
-    # Set the color of spines (borders) to white and change their transparency
-    for spine in ax.spines.values():
-      spine.set_color(legend_color)
-      spine.set_alpha(0.5)
+    # # Fill the area below the stock price line with a color
+    # if area_chart:
+    #   if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+    #     ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_negative, alpha=0.3, zorder=-1)
+    #   else:
+    #     ax.fill_between(self.data.index, self.data['Close'], color=chart_area_color_positive, alpha=0.3, zorder=-1)
 
-    # ax.autoscale()
-    # self.figure.set_size_inches(4.8, 2)
+    # # Customize the plot
+    # # ax.set_xlabel('Date', color='white', fontsize=10)
+    # # ax.set_ylabel('Stock Price (USD)', color='white', fontsize=10)
+    # # ax.set_title(f'{stock.upper()} Stock Price Chart', color=legend_color, fontsize=10)
+    # # if debug:
+    # #   ax.set_facecolor('yellow')
+    # # else:
+    # ax.set_facecolor('none')
 
-    # Set y-axis limits to avoid the area graph from being pushed up
-    ymin = self.data['Close'].min()
-    ymax = self.data['Close'].max()
-    padding = padding_multiplier * (ymax - ymin)
-    ax.set_ylim(ymin - padding, ymax + padding)
+    # ax.tick_params(which='minor', size=0)
+    # ax.tick_params(color=legend_color, labelcolor=legend_color)
+    # ax.tick_params(left = False, bottom = False)
+    # ax.tick_params(axis='x', which='major', labelsize=8, pad=0)
+    # ax.tick_params(axis='y', which='major', labelsize=8, pad=0)
+    # # Remove left and right margins
+    # ax.margins(x=0)
+    # # Remove graph frame (borders)
+    # # ax.spines['top'].set_visible(False)
+    # # ax.spines['right'].set_visible(False)
+    # # ax.spines['bottom'].set_visible(False)
+    # # ax.spines['left'].set_visible(False)
+    # # ax.spines['top'].set_color(legend_color)
+    # # ax.spines['right'].set_color(legend_color)
+    # # ax.spines['bottom'].set_color(legend_color)
+    # # ax.spines['left'].set_color(legend_color)
+    # # ax.spines['top'].set_alpha(0.5)
+    # # ax.spines['right'].set_alpha(0.5)
+    # # ax.spines['bottom'].set_alpha(0.5)
+    # # ax.spines['left'].set_alpha(0.5)
+    # # Set the color of spines (borders) to white and change their transparency
+    # for spine in ax.spines.values():
+    #   spine.set_color(legend_color)
+    #   spine.set_alpha(0.5)
 
-    if self.bought_line:
-      # if line would not be visible (value too small or large) display it at bottom or top of visible plot
-      y_min, y_max = ax.get_ylim()
-      if self.value_to_highlight < y_min:
-        # offset because line is being drawn just below value and would be outside of plot otherwise (not appear)
-        # offset = 0.01 * (y_max - y_min)
-        # ax.axhline(y=y_min + offset, color='yellow', linewidth=1)
-        # ax.scatter(0, y_min + offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
-        # line_width_offset tries to only offset 1 pixel (the bought lines' width, wheras offset takes 1% of entire data)
-        line_width_offset = 1 / (ax.transData.transform([0, 1])[1] - ax.transData.transform([0, 0])[1])
-        ax.axhline(y=y_min + line_width_offset, color='yellow', linewidth=1)
-        ax.scatter(0, y_min + line_width_offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
-      elif self.value_to_highlight > y_max:
-        ax.axhline(y=y_max, color='yellow', linewidth=1)
-        ax.scatter(0, y_max, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
-      else:
-        ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
-        ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+    # # ax.autoscale()
+    # # self.figure.set_size_inches(4.8, 2)
 
-    if monday_lines:
-      formatted_dates = [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]]
-      # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
-      prev_week = None
-      for i, formatted_date in enumerate(formatted_dates):
-        date_obj = datetime.strptime(formatted_date, "%B %d")
-        if prev_week is not None and prev_week != date_obj.isocalendar()[1]:
-            # Draw a vertical line at position i
-            ax.axvline(i * y_label_every_x_datapoints, color=monday_lines_color, alpha=monday_lines_transparency, linestyle=monday_lines_style, linewidth=monday_lines_width)
-        prev_week = date_obj.isocalendar()[1]
+    # # Set y-axis limits to avoid the area graph from being pushed up
+    # ymin = self.data['Close'].min()
+    # ymax = self.data['Close'].max()
+    # padding = padding_multiplier * (ymax - ymin)
+    # ax.set_ylim(ymin - padding, ymax + padding)
 
-    if horizontal_lines:
-      # Add horizontal lines at every y-tick position
-      y_ticks_positions = ax.get_yticks()
-      for y_tick_position in y_ticks_positions:
-        ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
+    # if self.bought_line:
+    #   # if line would not be visible (value too small or large) display it at bottom or top of visible plot
+    #   y_min, y_max = ax.get_ylim()
+    #   if self.value_to_highlight < y_min:
+    #     # offset because line is being drawn just below value and would be outside of plot otherwise (not appear)
+    #     # offset = 0.01 * (y_max - y_min)
+    #     # ax.axhline(y=y_min + offset, color='yellow', linewidth=1)
+    #     # ax.scatter(0, y_min + offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+    #     # line_width_offset tries to only offset 1 pixel (the bought lines' width, wheras offset takes 1% of entire data)
+    #     line_width_offset = 1 / (ax.transData.transform([0, 1])[1] - ax.transData.transform([0, 0])[1])
+    #     ax.axhline(y=y_min + line_width_offset, color='yellow', linewidth=1)
+    #     ax.scatter(0, y_min + line_width_offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+    #   elif self.value_to_highlight > y_max:
+    #     ax.axhline(y=y_max, color='yellow', linewidth=1)
+    #     ax.scatter(0, y_max, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+    #   else:
+    #     ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
+    #     ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
 
-    x_labels = range(len(self.data['Datetime']))
-    ax.set_xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
-    ax.xaxis.set_minor_locator(FixedLocator(x_labels))
-    # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
-    # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
-    ax.yaxis.set_tick_params(color=legend_color)  # Set y tick labels text color to white
+    # if monday_lines:
+    #   formatted_dates = [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]]
+    #   # Loop through the formatted dates and draw vertical lines at the beginning of each Monday
+    #   prev_week = None
+    #   for i, formatted_date in enumerate(formatted_dates):
+    #     date_obj = datetime.strptime(formatted_date, "%B %d")
+    #     if prev_week is not None and prev_week != date_obj.isocalendar()[1]:
+    #         # Draw a vertical line at position i
+    #         ax.axvline(i * y_label_every_x_datapoints, color=monday_lines_color, alpha=monday_lines_transparency, linestyle=monday_lines_style, linewidth=monday_lines_width)
+    #     prev_week = date_obj.isocalendar()[1]
 
-    # plt.tight_layout(pad=0.1) # TODO 0.1 otherwise right border is not visible
-    # plt.autoscale(axis='x')
-    # Refresh the canvas to update the plot
-    self.canvas.draw()
+    # if horizontal_lines:
+    #   # Add horizontal lines at every y-tick position
+    #   y_ticks_positions = ax.get_yticks()
+    #   for y_tick_position in y_ticks_positions:
+    #     ax.axhline(y_tick_position, color=horizontal_lines_color, alpha=horizontal_lines_transparency, linestyle=horizontal_lines_style, linewidth=horizontal_lines_width)
+
+    # x_labels = range(len(self.data['Datetime']))
+    # ax.set_xticks(x_labels[::y_label_every_x_datapoints], [format_x_label(str(label)) for label in self.data['Datetime'][::y_label_every_x_datapoints]], ha='center', color=legend_color)
+    # ax.xaxis.set_minor_locator(FixedLocator(x_labels))
+    # # plt.gca().xaxis.set_minor_formatter(FuncFormatter(lambda x, pos: ""))
+    # # plt.xticks(rotation=45, color='white') # Rotate the x-axis labels for better readability
+    # ax.yaxis.set_tick_params(color=legend_color)  # Set y tick labels text color to white
+
+    # # plt.tight_layout(pad=0.1) # TODO 0.1 otherwise right border is not visible
+    # # plt.autoscale(axis='x')
+    # # Refresh the canvas to update the plot
+    # self.canvas.draw()
     logging.info("Done Plotting Stock")

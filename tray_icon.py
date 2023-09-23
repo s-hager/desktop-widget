@@ -3,7 +3,6 @@ from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QIcon, QAction, QCursor
 import logging
 import re
-import threading
 
 # own files:
 from settings_window import SettingsWindow
@@ -20,8 +19,7 @@ class TrayIcon:
     all_keys = settings.allKeys()
     for i, key in enumerate(all_keys):
       if key.startswith("window_") and key.endswith("_symbol"):
-        plot_thread = threading.Thread(target=self.loadChartFromConfig, args=(key,))
-        plot_thread.start()
+        self.loadChartFromConfig(key)
     logging.info("Done Showing all windows")
 
     # Ensure only one settings window exists at a time:
