@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
-from PyQt6.QtCore import QCoreApplication
+from PyQt6.QtCore import QCoreApplication, QThread
 from PyQt6.QtGui import QIcon, QAction, QCursor
 import logging
 import re
+import threading
 
 # own files:
 from settings_window import SettingsWindow
@@ -19,16 +20,8 @@ class TrayIcon:
     all_keys = settings.allKeys()
     for i, key in enumerate(all_keys):
       if key.startswith("window_") and key.endswith("_symbol"):
-        window_symbol = settings.value(key).upper()
-        window_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
-        if window_id > self.window_id_counter:
-          self.window_id_counter = window_id
-        window = ChartWindow(self, window_symbol, window_id)
-        logging.info(f"Showing Window with id {window_id}")
-        window.applyConfig() # load windows' settings from config
-        window.show()
-        window.plotStock()
-        self.windows.append(window)
+        plot_thread = threading.Thread(target=self.loadChartFromConfig, args=(key,))
+        plot_thread.start()
     logging.info("Done Showing all windows")
 
     # Ensure only one settings window exists at a time:
@@ -69,6 +62,18 @@ class TrayIcon:
 
     # Show the system tray icon
     self.tray_icon.show()
+
+  def loadChartFromConfig(self, key):
+    window_symbol = settings.value(key).upper()
+    window_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
+    if window_id > self.window_id_counter:
+      self.window_id_counter = window_id
+    window = ChartWindow(self, window_symbol, window_id)
+    logging.info(f"Showing Window with id {window_id}")
+    window.applyConfig() # load windows' settings from config
+    window.show()
+    window.plotStock()
+    self.windows.append(window)
 
   def quitApp(self):
     logging.info("Quitting Application")
