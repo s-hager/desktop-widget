@@ -1,0 +1,23 @@
+[General]
+window_0_symbol=MU
+window_0_pos=@Point(-1562 3)
+window_0_size=@Size(384 216)
+window_2_symbol=CVS
+window_2_pos=@Point(-1171 233)
+window_2_size=@Size(384 216)
+window_0_bought_line_value=66
+window_0_bought_line=true
+window_3_symbol=AMZN
+window_3_pos=@Point(-1559 235)
+window_3_size=@Size(384 216)
+window_2_bought_line_value=67
+window_2_bought_line=true
+window_3_bought_line=false
+window_3_bought_line_value=133
+launch_on_startup=false
+window_4_symbol=EUNL.DE
+window_4_pos=@Point(-1558 455)
+window_4_size=@Size(384 216)
+window_5_symbol=SXR8.DE
+window_5_pos=@Point(-1168 3)
+window_5_size=@Size(384 216)

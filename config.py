@@ -2,8 +2,10 @@
 app_name="StockWidget" # used as name for reg variable for auto startup
 # stock_symbol = "mu"
 legend_color = 'white'
-chart_area_color_positive = 'green'
-chart_area_color_negative = '#a60c0c'
+chart_area_color_positive = 'green' # used with matplotlib (outdated)
+chart_area_color_negative = '#a60c0c' # used with matplotlib (outdated)
+chart_area_color_positive_trans = (0, 255, 0, 20) # used with pyqtgraph
+chart_area_color_negative_trans = (255, 0, 0, 20) # used with pyqtgraph
 chart_line_color_positive = '#4ece6f'
 chart_line_color_negative = '#ff2626'
 area_chart = True

@@ -15,6 +15,7 @@ import pandas as pd
 import yfinance as yf
 import logging
 import time
+import calendar
 
 # own variables:
 from config import *
@@ -228,6 +229,8 @@ class ChartWindow(QMainWindow):
         self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
         self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+        # print(type(self.data['Datetime']))
+        # print(self.data['Datetime'])
         break
       except Exception as e:
         logging.info(f"An exception occured: {e}")
@@ -367,25 +370,99 @@ class ChartWindow(QMainWindow):
 
   def plotStock(self):
     # Function to convert datetime string to "July 26" format
-    def format_x_label(datetime_str):
-      # Parse the datetime string to a datetime object
-      dt_obj = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S%z")
-      # Format the datetime object to "July 26" format
-      formatted_date = dt_obj.strftime("%B %d")
-      return formatted_date
+    # def format_x_label(datetime_str):
+    #   # Parse the datetime string to a datetime object
+    #   dt_obj = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S%z")
+    #   # Format the datetime object to "July 26" format
+    #   formatted_date = dt_obj.strftime("%B %d")
+    #   return formatted_date
 
     logging.info("Plotting Stock...")
     # Clear the existing plot
     self.plotItem.clear()
 
+
+    # print(np.arange(len(self.data['Datetime'])))
     # Plot the stock data
     x = np.arange(len(self.data['Datetime']))
+    # print(self.data['Datetime'])
+    # x = self.data['Datetime']
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
+    # print(self.data['Datetime'])
+    # x = self.data['Datetime']
+    # x = [x.timestamp() for x in x]
+    # print(x)
+    # print(self.data['Datetime'][0])
+    # print(type(self.data['Datetime'][0]))
+    
+    def find_open_dates():
+      # # https://www.swingtradesystems.com/trading-days-calendars.html
+      open_dates = []
+      for index, timestamp in enumerate(self.data['Datetime']):
+        # if date n + 1 - 1 day is not equal to date n
+        # if self.data['Datetime'][index + 1] is not None and timestamp.day != self.data['Datetime'][index + 1].day - 1: #and timestamp.month == self.data['Datetime'][index + 1].month:
+        try:
+          if timestamp.day != self.data['Datetime'][index + 1].day: #and timestamp.month == self.data['Datetime'][index + 1].month:
+            # print("x")
+            # print(timestamp.day)
+            # print(self.data['Datetime'][index + 1].day)
+          # if timestamp.day != self.data['Datetime'][index + 1].day: #and timestamp.month == self.data['Datetime'][index + 1].month:
+            # stock market closed detected
+            # print(timestamp.day, self.data['Datetime'][index + 1].day - 1)
+            # print(timestamp.day, self.data['Datetime'][index + 1].day)
+            # print(self.data['Datetime'][index])
+            open_dates.append((timestamp.day, timestamp.month, timestamp.year, index))
+        except KeyError:
+          open_dates.append((timestamp.day, timestamp.month, timestamp.year, index))
+          # print(timestamp.day)
+          # print(self.data['Datetime'][index])
+          break
+      # print(dates)
+      open_dates = pd.unique(open_dates)
+      # print(open_dates)
+      return open_dates
+
+    def find_first_day_after_gap(dates_list):
+      result_days = []
+      indices = []
+      length = len(dates_list)
+      for index, date in enumerate(dates_list):
+        _, days_in_month = calendar.monthrange(date[2], date[1])
+        if index + 1 <= length - 1:  # if index + 1 is still valid list index
+          if date[0] == days_in_month and dates_list[index + 1][0] == 1:
+            continue
+          elif date[0] != dates_list[index + 1][0] - 1:  # if date day n does not equal date day n+1 - 1
+            first_day_after_gap_date = dates_list[index + 1][0:3]
+            first_day_after_gap_index = dates_list[index + 1][3]
+            result_days.append(first_day_after_gap_date)
+            indices.append(first_day_after_gap_index)
+      # print(days)
+      return result_days, indices
+
+    open_dates = find_open_dates()
+    days, indices = find_first_day_after_gap(open_dates)
+    # print(days, indices)
+    # custom_x_labels = days
+    # custom_x_labels = [f'{t[0]}.{t[1]}.{t[2]}' for t in days]
+    custom_x_labels = [f'{date[0]}.{date[1]}.' for date in days]
+    custom_x_ticks = indices
+
+    self.graphWidget.getAxis('bottom').setTicks([[(val, label) for val, label in zip(custom_x_ticks, custom_x_labels)]])
+
     y = self.data['Close']
     
+    # Create a DateAxisItem for the x-axis
+    # axis = pg.DateAxisItem()
+    # self.plotItem.setAxisItems({'bottom':axis})
+
     # Customize plot appearance
     self.graphWidget.showGrid(x=True, y=True)
     self.graphWidget.getAxis('left').setGrid(False)
     self.graphWidget.getAxis('bottom').setGrid(False)
+
+    max_x_value = len(self.data['Close'])
+    self.graphWidget.setXRange(0, max_x_value, padding=0)
 
     # check if oldest close value is smaller or bigger than newest close value
     positive_chart = None
@@ -397,27 +474,24 @@ class ChartWindow(QMainWindow):
     # Conditional Line Color
     if positive_chart:
         chart_line_color = chart_line_color_negative
-        chart_area_color = chart_area_color_negative
+        chart_area_color = chart_area_color_negative_trans
     else:
         chart_line_color = chart_line_color_positive
-        chart_area_color = chart_area_color_positive
-
+        chart_area_color = chart_area_color_positive_trans
 
     # Fill the area below the stock price line with a color
     if area_chart:
       # TODO: the y "limits" are not being set correctly
-      # line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=100, brush=chart_area_color)
-      line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
+      self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=0, brush=chart_area_color)
+      self.graphWidget.setYRange(min(self.data['Close']), max(self.data['Close']))
+      # self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
     else:
-      line_plot = self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
+      self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
 
     # https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-showgrid-is-called
     for key in ['right', 'top']:
       self.graphWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
       self.graphWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
-    
-    max_x_value = len(self.data['Close'])
-    self.graphWidget.setXRange(0, max_x_value, padding=0)
 
     # Refresh the graph
     self.graphWidget.update()
