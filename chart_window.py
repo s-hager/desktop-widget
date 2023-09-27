@@ -34,6 +34,32 @@ from constants import *
 #       return ''
 #     return self.dates[index].strftime(self.format)
 
+class CrosshairPlotWidget(pg.PlotWidget):
+  def __init__(self, parent=None, background='default', plotItem=None, **kargs):
+    super().__init__(parent=parent, background=background, plotItem=plotItem, **kargs)
+    self.vLine = pg.InfiniteLine(angle=90, movable=False)
+    self.hLine = pg.InfiniteLine(angle=0, movable=False)
+    self.addItem(self.vLine, ignoreBounds=True)
+    self.addItem(self.hLine, ignoreBounds=True)
+    self.vLine.show()
+    self.hLine.show()
+
+  def leaveEvent(self, event):
+    self.vLine.hide()
+    self.hLine.hide()
+
+  def enterEvent(self, event):
+    self.vLine.show()
+    self.hLine.show()
+
+  def mouseMoveEvent(self, event):
+    vb = self.plotItem.vb
+    pos = event.position()
+    if self.sceneBoundingRect().contains(pos):
+      mousePoint = vb.mapSceneToView(pos)
+      self.vLine.setPos(mousePoint.x())
+      self.hLine.setPos(mousePoint.y())
+
 class ChartWindow(QMainWindow):
   def __init__(self, tray_icon, stock_symbol, window_id):
     super(ChartWindow, self).__init__(parent=None)
@@ -86,9 +112,15 @@ class ChartWindow(QMainWindow):
     # self.roundCorners() # TODO
 
     # Create plot
-    self.graphWidget = pg.PlotWidget()
-    self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.graphWidget.setBackground(pg.mkColor(0, 0, 0, 0))
+    if crosshair:
+      self.plotWidget = CrosshairPlotWidget()
+    else:
+      self.plotWidget = pg.PlotWidget()
+    # self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    self.plotWidget.setBackground(pg.mkColor(0, 0, 0, 0))
+    self.plotWidget.setMouseEnabled(x=False, y=False)
+    self.plotWidget.setMenuEnabled(False)
+    self.plotWidget.hideButtons()
     
     # https://stackoverflow.com/questions/38795508/autoranging-plotwidget-without-padding-pyqtgraph
     # https://stackoverflow.com/a/65545219
@@ -102,7 +134,7 @@ class ChartWindow(QMainWindow):
     # self.view_box.enableAutoRange()
     # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
-    self.plotItem = self.graphWidget.plotItem
+    self.plotItem = self.plotWidget.plotItem
 
     # # Create a Figure and Canvas for Matplotlib plot
     # if debug:
@@ -125,7 +157,7 @@ class ChartWindow(QMainWindow):
     self.title_widget = self.titleWidget()
     self.title_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
     # self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    self.graphWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    self.plotWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     
     # Call the method to plot the stock graph on the canvas
     # self.plotStock()
@@ -133,7 +165,7 @@ class ChartWindow(QMainWindow):
     layout = QVBoxLayout()
     layout.addWidget(self.title_widget)
     # layout.addWidget(self.canvas)
-    layout.addWidget(self.graphWidget)
+    layout.addWidget(self.plotWidget)
     if display_refresh_time:
       layout.addWidget(self.refreshTimeLabel())
     layout.setSpacing(0)
@@ -149,7 +181,7 @@ class ChartWindow(QMainWindow):
       self.central_widget.setStyleSheet("border: 1px solid red;")
 
     # self.canvas.installEventFilter(self)
-    self.graphWidget.installEventFilter(self)
+    self.plotWidget.installEventFilter(self)
 
     self.addResizeGrips()
     self.startRefreshTimer()
@@ -378,13 +410,15 @@ class ChartWindow(QMainWindow):
     #   return formatted_date
 
     logging.info("Plotting Stock...")
+    
     # Clear the existing plot
-    self.plotItem.clear()
+    # self.plotItem.clear()
 
 
     # print(np.arange(len(self.data['Datetime'])))
     # Plot the stock data
     x = np.arange(len(self.data['Datetime']))
+    y = self.data['Close']
     # print(self.data['Datetime'])
     # x = self.data['Datetime']
     # pd.set_option('display.max_rows', None)
@@ -419,7 +453,8 @@ class ChartWindow(QMainWindow):
           # print(self.data['Datetime'][index])
           break
       # print(dates)
-      open_dates = pd.unique(open_dates)
+      open_dates_series = pd.Series(open_dates)
+      open_dates = open_dates_series.unique()
       # print(open_dates)
       return open_dates
 
@@ -440,29 +475,37 @@ class ChartWindow(QMainWindow):
       # print(days)
       return result_days, indices
 
+    # Create custom ticks and labels for x axis
     open_dates = find_open_dates()
     days, indices = find_first_day_after_gap(open_dates)
     # print(days, indices)
     # custom_x_labels = days
     # custom_x_labels = [f'{t[0]}.{t[1]}.{t[2]}' for t in days]
-    custom_x_labels = [f'{date[0]}.{date[1]}.' for date in days]
-    custom_x_ticks = indices
+    if display_first_date_as_tick:
+      oldest_data = self.data['Datetime'][0]
+      oldest_day = (oldest_data.day, oldest_data.month, oldest_data.year)
+      days.insert(0, oldest_day)
+      indices.insert(0, 0)
+      print(days) # oldest day not showing????
+      print(indices) # oldest day not showing????
 
-    self.graphWidget.getAxis('bottom').setTicks([[(val, label) for val, label in zip(custom_x_ticks, custom_x_labels)]])
+    x_labels = [f'{date[0]}.{date[1]}.' for date in days]
+    x_ticks = indices
 
-    y = self.data['Close']
+    self.plotWidget.getAxis('bottom').setTicks([[(val, label) for val, label in zip(x_ticks, x_labels)]])
+
     
     # Create a DateAxisItem for the x-axis
     # axis = pg.DateAxisItem()
     # self.plotItem.setAxisItems({'bottom':axis})
 
     # Customize plot appearance
-    self.graphWidget.showGrid(x=True, y=True)
-    self.graphWidget.getAxis('left').setGrid(False)
-    self.graphWidget.getAxis('bottom').setGrid(False)
+    self.plotWidget.showGrid(x=True, y=True)
+    self.plotWidget.getAxis('left').setGrid(False)
+    self.plotWidget.getAxis('bottom').setGrid(False)
 
     max_x_value = len(self.data['Close'])
-    self.graphWidget.setXRange(0, max_x_value, padding=0)
+    self.plotWidget.setXRange(0, max_x_value, padding=0)
 
     # check if oldest close value is smaller or bigger than newest close value
     positive_chart = None
@@ -483,18 +526,18 @@ class ChartWindow(QMainWindow):
     if area_chart:
       # TODO: the y "limits" are not being set correctly
       self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=0, brush=chart_area_color)
-      self.graphWidget.setYRange(min(self.data['Close']), max(self.data['Close']))
+      self.plotWidget.setYRange(min(self.data['Close']), max(self.data['Close']))
       # self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
     else:
       self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
 
     # https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-showgrid-is-called
     for key in ['right', 'top']:
-      self.graphWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
-      self.graphWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
+      self.plotWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
+      self.plotWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
 
     # Refresh the graph
-    self.graphWidget.update()
+    self.plotWidget.update()
 
     # stock = "AAPL"
     # data = yf.download(stock, interval="1h", period="1mo", prepost=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]

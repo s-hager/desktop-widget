@@ -10,10 +10,10 @@ import time
 import os
 if 'nt' in sys.builtin_module_names:
   import winreg as reg
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.ticker import Formatter, FixedLocator
+# import matplotlib.pyplot as plt
+# import matplotlib.ticker as ticker
+# from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.ticker import Formatter, FixedLocator
 from datetime import datetime
 import numpy as np
 import pandas as pd
