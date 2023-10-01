@@ -156,6 +156,7 @@ class SettingsWindow(QMainWindow):
       self.window.drag_resize = not self.window.drag_resize
       if self.window.drag_resize:
         logging.info(f"Unlocking Window with id {self.window_id}")
+        self.window.toggleCrosshair()
         self.lock_button.setIcon(QIcon(resourcePath("unlocked.png")))
         self.window.showResizeGrips()
         self.window.positionGrips()
@@ -163,6 +164,7 @@ class SettingsWindow(QMainWindow):
         self.window.central_widget.setStyleSheet("QWidget#central_widget { border: 2px solid yellow; }") # yellow border to show unlocked status
       else:
         logging.info(f"Locking Window with id {self.window_id}")
+        self.window.toggleCrosshair()
         if debug:
           self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
         else:

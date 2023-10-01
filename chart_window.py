@@ -35,30 +35,35 @@ from constants import *
 #     return self.dates[index].strftime(self.format)
 
 class CrosshairPlotWidget(pg.PlotWidget):
-  def __init__(self, parent=None, background='default', plotItem=None, **kargs):
+  def __init__(self, crosshair, parent=None, background='default', plotItem=None, **kargs):
     super().__init__(parent=parent, background=background, plotItem=plotItem, **kargs)
-    self.vLine = pg.InfiniteLine(angle=90, movable=False)
-    self.hLine = pg.InfiniteLine(angle=0, movable=False)
-    self.addItem(self.vLine, ignoreBounds=True)
-    self.addItem(self.hLine, ignoreBounds=True)
-    self.vLine.show()
-    self.hLine.show()
-
+    self.crosshair = crosshair
+    self.vLine = None
+    self.hLine = None
+    # self.vLine.show()
+    # self.hLine.show()
+  
   def leaveEvent(self, event):
-    self.vLine.hide()
-    self.hLine.hide()
+    if self.crosshair:
+      self.vLine.hide()
+      self.hLine.hide()
 
   def enterEvent(self, event):
-    self.vLine.show()
-    self.hLine.show()
+    if self.crosshair:
+      self.vLine.show()
+      self.hLine.show()
 
   def mouseMoveEvent(self, event):
-    vb = self.plotItem.vb
-    pos = event.position()
-    if self.sceneBoundingRect().contains(pos):
-      mousePoint = vb.mapSceneToView(pos)
-      self.vLine.setPos(mousePoint.x())
-      self.hLine.setPos(mousePoint.y())
+    if self.crosshair:
+      vb = self.plotItem.vb
+      pos = event.position()
+      if self.sceneBoundingRect().contains(pos):
+        mousePoint = vb.mapSceneToView(pos)
+        self.vLine.setPos(mousePoint.x())
+        self.hLine.setPos(mousePoint.y())
+
+  def toggleCrosshair(self):
+    self.crosshair = not self.crosshair
 
 class ChartWindow(QMainWindow):
   def __init__(self, tray_icon, stock_symbol, window_id):
@@ -68,6 +73,7 @@ class ChartWindow(QMainWindow):
     self.stock_symbol = stock_symbol
     self.drag_start_position = None
     self.bought_line = False
+    self.initial_crosshair = True
     # self.value_to_highlight = 68.82
     self.value_to_highlight = 0
     logging.info(f"Start Creating Window with id {window_id}")
@@ -112,10 +118,7 @@ class ChartWindow(QMainWindow):
     # self.roundCorners() # TODO
 
     # Create plot
-    if crosshair:
-      self.plotWidget = CrosshairPlotWidget()
-    else:
-      self.plotWidget = pg.PlotWidget()
+    self.plotWidget = CrosshairPlotWidget(self.initial_crosshair)
     # self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     self.plotWidget.setBackground(pg.mkColor(0, 0, 0, 0))
     self.plotWidget.setMouseEnabled(x=False, y=False)
@@ -208,6 +211,13 @@ class ChartWindow(QMainWindow):
 
   # def resizeEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
+
+  def toggleCrosshair(self):
+    self.plotWidget.toggleCrosshair()
+    if self.plotWidget.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents):
+      self.plotWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+    else:
+      self.plotWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
   def applyConfig(self):
     logging.info(f"Applying config to {self.window_id}")
@@ -412,8 +422,13 @@ class ChartWindow(QMainWindow):
     logging.info("Plotting Stock...")
     
     # Clear the existing plot
-    # self.plotItem.clear()
+    self.plotItem.clear()
 
+    # add crosshair
+    self.plotWidget.vLine = pg.InfiniteLine(angle=90, movable=False)
+    self.plotWidget.hLine = pg.InfiniteLine(angle=0, movable=False)
+    self.plotWidget.addItem(self.plotWidget.vLine, ignoreBounds=True)
+    self.plotWidget.addItem(self.plotWidget.hLine, ignoreBounds=True)
 
     # print(np.arange(len(self.data['Datetime'])))
     # Plot the stock data
@@ -481,13 +496,14 @@ class ChartWindow(QMainWindow):
     # print(days, indices)
     # custom_x_labels = days
     # custom_x_labels = [f'{t[0]}.{t[1]}.{t[2]}' for t in days]
-    if display_first_date_as_tick:
-      oldest_data = self.data['Datetime'][0]
-      oldest_day = (oldest_data.day, oldest_data.month, oldest_data.year)
-      days.insert(0, oldest_day)
-      indices.insert(0, 0)
-      print(days) # oldest day not showing????
-      print(indices) # oldest day not showing????
+    
+    # if display_first_date_as_tick:
+    #   oldest_data = self.data['Datetime'][0]
+    #   oldest_day = (oldest_data.day, oldest_data.month, oldest_data.year)
+    #   days.insert(0, oldest_day)
+    #   indices.insert(0, 0)
+    #   print(days) # oldest day not showing????
+    #   print(indices) # oldest day not showing????
 
     x_labels = [f'{date[0]}.{date[1]}.' for date in days]
     x_ticks = indices
@@ -504,8 +520,10 @@ class ChartWindow(QMainWindow):
     self.plotWidget.getAxis('left').setGrid(False)
     self.plotWidget.getAxis('bottom').setGrid(False)
 
-    max_x_value = len(self.data['Close'])
+    max_x_value = len(self.data['Close']) - 1
     self.plotWidget.setXRange(0, max_x_value, padding=0)
+    # self.plotWidget.setXRange(0, max_x_value, padding=0.005)
+    # self.plotWidget.setXRange(0, max_x_value)
 
     # check if oldest close value is smaller or bigger than newest close value
     positive_chart = None
