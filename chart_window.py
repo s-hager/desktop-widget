@@ -510,7 +510,6 @@ class ChartWindow(QMainWindow):
 
     self.plotWidget.getAxis('bottom').setTicks([[(val, label) for val, label in zip(x_ticks, x_labels)]])
 
-    
     # Create a DateAxisItem for the x-axis
     # axis = pg.DateAxisItem()
     # self.plotItem.setAxisItems({'bottom':axis})
@@ -519,6 +518,14 @@ class ChartWindow(QMainWindow):
     self.plotWidget.showGrid(x=True, y=True)
     self.plotWidget.getAxis('left').setGrid(False)
     self.plotWidget.getAxis('bottom').setGrid(False)
+
+    self.plotWidget.getAxis('left').setTextPen(legend_color)
+    self.plotWidget.getAxis('bottom').setTextPen(legend_color)
+
+    self.plotWidget.getAxis('left').setPen(legend_color)
+    self.plotWidget.getAxis('bottom').setPen(legend_color)
+    self.plotWidget.getAxis('right').setPen(legend_color)
+    self.plotWidget.getAxis('top').setPen(legend_color)
 
     max_x_value = len(self.data['Close']) - 1
     self.plotWidget.setXRange(0, max_x_value, padding=0)
@@ -553,6 +560,45 @@ class ChartWindow(QMainWindow):
     for key in ['right', 'top']:
       self.plotWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
       self.plotWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
+
+    # self.plotWidget.hLine = pg.InfiniteLine(angle=0, movable=False)
+    # self.plotWidget.addItem(self.plotWidget.vLine, ignoreBounds=True)
+
+    if self.bought_line:
+      # if line would not be visible (value too small or large) display it at bottom or top of visible plot
+      y_min = self.plotWidget.getViewBox().getState()['viewRange'][1][0]
+      y_max = self.plotWidget.getViewBox().getState()['viewRange'][1][1]
+      bought_line = pg.InfiniteLine(angle=0, movable=False, pen=pg.mkPen((255, 255, 0, 255), width=1.5))
+      dot = pg.ScatterPlotItem(symbol='o', size=10, pen=pg.mkPen(None), brush=pg.mkBrush((255, 255, 0, 255)))
+      self.plotWidget.addItem(bought_line, ignoreBounds=True)
+      self.plotWidget.addItem(dot, ignoreBounds=True)
+      if self.value_to_highlight < y_min:
+        # offset because line is being drawn just below value and would be outside of plot otherwise (not appear)
+        # offset = 0.01 * (y_max - y_min)
+        # ax.axhline(y=y_min + offset, color='yellow', linewidth=1)
+        # ax.scatter(0, y_min + offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+        # line_width_offset tries to only offset 1 pixel (the bought lines' width, wheras offset takes 1% of entire data)
+        # line_width_offset = 1 / (ax.transData.transform([0, 1])[1] - ax.transData.transform([0, 0])[1])
+        # ax.axhline(y=y_min + line_width_offset, color='yellow', linewidth=1)
+        # self.plotWidget.addItem(pg.InfiniteLine(angle=0, movable=False), ignoreBounds=True)
+        # ax.scatter(0, y_min + line_width_offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+        offset = 0.0015 * (y_max - y_min)
+        bought_line.setPos(y_min + offset)
+        dot.setData(pos=[(0, y_min + offset)])
+      elif self.value_to_highlight > y_max:
+        offset = 0.0025 * (y_max - y_min)
+        bought_line.setPos(y_max - offset)
+        # bought_line.setPos(y_max)
+        dot.setData(pos=[(0, y_max - offset)])
+        # dot.setData(pos=[(0, y_max)])
+        # bought_line.setPos(self.value_to_highlight)
+        # ax.axhline(y=y_max, color='yellow', linewidth=1)
+        # ax.scatter(0, y_max, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
+      else:
+        bought_line.setPos(self.value_to_highlight)
+        dot.setData(pos=[(0, self.value_to_highlight)])
+      #   ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
+      #   ax.scatter(0, self.value_to_highlight, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
 
     # Refresh the graph
     self.plotWidget.update()
