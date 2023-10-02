@@ -7,7 +7,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['windows-latest', 'ubuntu-latest', 'macos-latest']
+        #os: ['windows-latest', 'ubuntu-latest', 'macos-latest']
+        os: ['windows-latest']
 
     steps:
     - uses: actions/checkout@v2
@@ -15,8 +16,8 @@ jobs:
       with:
         python-version: 3.11
 
-    - run: pip install -r requirements.txt pyinstaller
-    - run: pyinstaller your-code.py
+    - run: pip install -r requirements.txt
+    - run: pyinstaller StockWidget.spec
     # Optionally verify that it works (provided that it does not need user interaction)
     #- run: ./dist/your-code/your-code
     - uses: actions/upload-artifact@v2
