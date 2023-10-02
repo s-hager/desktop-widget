@@ -1,0 +1,47 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        #os: ['windows-latest', 'ubuntu-latest', 'macos-latest']
+        os: ['windows-latest']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+
+    - name: Install Python dependencies
+      run: pip install -r requirements.txt
+
+    - name: Build the application
+      run: pyinstaller StockWidget.spec
+      
+    # Optionally verify that it works (provided that it does not need user interaction)
+    #- run: ./dist/your-code/your-code
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        path: dist/*
+        
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/StockWidget.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    #- name: Get Release URL
+    #  run: echo "Release URL: ${{ steps.create_release.outputs.upload_url }}"
