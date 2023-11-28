@@ -57,7 +57,7 @@ class ChartSettingsWindow(QDialog):
       except ValueError:
         QMessageBox.critical(self, "Error", "Bought Line Value has to be floating point number.")
         self.bought_line_checkbox.setChecked(False)
-        self.bought_line_value.clear()
+        self.bought_line_raw_value.clear()
         return False
     return True
 

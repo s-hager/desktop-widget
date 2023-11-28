@@ -6,6 +6,9 @@ source venv/bin/activate
 ### activate venv (windows):
 venv\Scripts\activate
 
+### run app with:
+python main.py
+
 ### build exe with:
 `pyinstaller app.py --paths=./venv/lib/site-packages --onefile`
 
@@ -37,3 +40,5 @@ https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-s
 
 pyqtgraph examples:
 $ python -m pyqtgraph.examples
+
+TODO: dont save symbol to config when symbol invalid (causes crash)

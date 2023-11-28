@@ -154,6 +154,7 @@ class ChartWindow(QMainWindow):
 
     # Get stock currency
     self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
+    # self.currency_symbol = yf.Ticker(self.stock_symbol).info["currency"]
 
     # Add the title bar and canvas to a vertical layout
 
@@ -573,6 +574,7 @@ class ChartWindow(QMainWindow):
       self.plotWidget.addItem(bought_line, ignoreBounds=True)
       self.plotWidget.addItem(dot, ignoreBounds=True)
       if self.value_to_highlight < y_min:
+        # "below" line
         # offset because line is being drawn just below value and would be outside of plot otherwise (not appear)
         # offset = 0.01 * (y_max - y_min)
         # ax.axhline(y=y_min + offset, color='yellow', linewidth=1)
@@ -582,11 +584,16 @@ class ChartWindow(QMainWindow):
         # ax.axhline(y=y_min + line_width_offset, color='yellow', linewidth=1)
         # self.plotWidget.addItem(pg.InfiniteLine(angle=0, movable=False), ignoreBounds=True)
         # ax.scatter(0, y_min + line_width_offset, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
-        offset = 0.0015 * (y_max - y_min)
+        window_height_correction = 1 / self.height()
+        offset = window_height_correction + 0.001 * (y_max - y_min)
+        # print("0.003___" + str(window_height_correction))
+        # print("0.004___" + str( window_height_correction + 0.001))
+        # print(offset)
         bought_line.setPos(y_min + offset)
         dot.setData(pos=[(0, y_min + offset)])
       elif self.value_to_highlight > y_max:
-        offset = 0.0025 * (y_max - y_min)
+        # "above" line
+        offset = 0.007 * (y_max - y_min)
         bought_line.setPos(y_max - offset)
         # bought_line.setPos(y_max)
         dot.setData(pos=[(0, y_max - offset)])
@@ -595,6 +602,7 @@ class ChartWindow(QMainWindow):
         # ax.axhline(y=y_max, color='yellow', linewidth=1)
         # ax.scatter(0, y_max, color='yellow', s=25, marker='o')  # 0 is the x-coordinate for the dot
       else:
+        # "normal" line
         bought_line.setPos(self.value_to_highlight)
         dot.setData(pos=[(0, self.value_to_highlight)])
       #   ax.axhline(y=self.value_to_highlight, color='yellow', linewidth=1)
