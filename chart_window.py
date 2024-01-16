@@ -16,6 +16,9 @@ import yfinance as yf
 import logging
 import time
 import calendar
+import sys
+
+import MyQLabel #TODO WIP
 
 # own variables:
 from config import *
@@ -110,7 +113,15 @@ class ChartWindow(QMainWindow):
       self.move(self.settings_position)
       self.setFixedSize(self.settings_size)
     self.setWindowTitle(f"{self.window_id}")
-    self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+    if sys.platform.startswith('darwin'):
+      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.FramelessWindowHint)
+    else:
+      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+
+    # Create a central widget to hold the layout
+    self.central_widget = QWidget()
+    self.central_widget.setObjectName("central_widget")
+    self.setCentralWidget(self.central_widget)
 
     logging.info("Blurring Background...")
     self.blurBackground()
@@ -120,7 +131,7 @@ class ChartWindow(QMainWindow):
     # Create plot
     self.plotWidget = CrosshairPlotWidget(self.initial_crosshair)
     # self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-    self.plotWidget.setBackground(pg.mkColor(0, 0, 0, 0))
+    self.plotWidget.setBackground(pg.mkColor(chart_background_color))
     self.plotWidget.setMouseEnabled(x=False, y=False)
     self.plotWidget.setMenuEnabled(False)
     self.plotWidget.hideButtons()
@@ -167,6 +178,8 @@ class ChartWindow(QMainWindow):
     # self.plotStock()
 
     layout = QVBoxLayout()
+    self.plotWidget.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
+    self.title_widget.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
     layout.addWidget(self.title_widget)
     # layout.addWidget(self.canvas)
     layout.addWidget(self.plotWidget)
@@ -176,11 +189,7 @@ class ChartWindow(QMainWindow):
     layout.setContentsMargins(*window_margins)
     # layout.setContentsMargins(0, 0, 0, 0)
 
-    # Create a central widget to hold the layout
-    self.central_widget = QWidget()
-    self.central_widget.setObjectName("central_widget")
     self.central_widget.setLayout(layout)
-    self.setCentralWidget(self.central_widget)
     if debug:
       self.central_widget.setStyleSheet("border: 1px solid red;")
 
@@ -306,6 +315,7 @@ class ChartWindow(QMainWindow):
     font.setPointSize(update_font_size)
     self.refresh_time_label.setFont(font)
     self.refresh_time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+    self.refresh_time_label.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
     return self.refresh_time_label
 
   def updateRefreshTimeLabel(self):
@@ -317,6 +327,7 @@ class ChartWindow(QMainWindow):
       title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
       title.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
     else:
+      #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
       title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
       title.setStyleSheet(f"color:{legend_color};")
     font = QFont()
@@ -406,7 +417,8 @@ class ChartWindow(QMainWindow):
     # GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
     GlobalBlur(self.winId(), Dark=True, Acrylic=False, QWidget=self)
     # self.setStyleSheet("background-color: lightgrey")
-    self.setStyleSheet("background-color: rgba(0, 0, 0, 0)")
+    self.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
+    self.central_widget.setStyleSheet(f"background-color: rgba{background_color};")
 
   def format_y_tick_label(self, value, pos):
     return f"{self.currency_symbol}{value:.2f}"

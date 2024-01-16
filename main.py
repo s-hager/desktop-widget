@@ -58,6 +58,15 @@ def main():
   # used to end app with ctrl + c
   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+  if sys.platform.startswith('darwin'):
+    import AppKit
+    NSApplicationActivationPolicyRegular = 0
+    NSApplicationActivationPolicyAccessory = 1
+    NSApplicationActivationPolicyProhibited = 2
+    AppKit.NSApp.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+    info = AppKit.NSBundle.mainBundle().infoDictionary()
+    info["LSBackgroundOnly"] = "1"
+
   logging.info("Creating Application...")
   app = QApplication(sys.argv)
   logging.info("Done Creating Application")
