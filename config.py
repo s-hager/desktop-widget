@@ -2,7 +2,7 @@
 app_name="StockWidget" # used as name for reg variable for auto startup
 # stock_symbol = "mu"
 legend_color = 'white'
-background_color = (0, 0, 0, 50)
+background_color = (0, 0, 0, 0)
 chart_background_color = (0, 0, 0, 0)
 chart_area_color_positive = 'green' # used with matplotlib (outdated)
 chart_area_color_negative = '#a60c0c' # used with matplotlib (outdated)
