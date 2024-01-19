@@ -32,6 +32,13 @@ python main.py
 
 `pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:."`
 
+### macos test builds
+`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/site-packages --name=blur_macos_ns --icon=icon.png --add-data "icon.png:." --target-arch=universal2`
+`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/site-packages --name=blur_macos_lib --icon=icon.png --add-data "icon.png:." --target-arch=universal2`
+`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/site-packages --name=blur_macos_lib --icon=icon.png --add-data "icon.png:."`
+`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/site-packages --name=blur_macos_ns --icon=icon.png --add-data "icon.png:."`
+
+
 ### then rebuild with
 pyinstaller app.spec
 pyinstaller StockWidget.spec

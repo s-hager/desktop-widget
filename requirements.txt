@@ -31,3 +31,7 @@ tzdata==2023.3
 urllib3==2.0.5
 webencodings==0.5.1
 yfinance==0.2.32
+# pyqt5
+# pyobjc
+pyobjc==10.1
+PyQt5==5.15.10 
