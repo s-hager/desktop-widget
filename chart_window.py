@@ -179,7 +179,6 @@ class ChartWindow(QMainWindow):
 
     layout = QVBoxLayout()
     self.plotWidget.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
-    self.title_widget.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
     layout.addWidget(self.title_widget)
     # layout.addWidget(self.canvas)
     layout.addWidget(self.plotWidget)
@@ -308,14 +307,13 @@ class ChartWindow(QMainWindow):
   def refreshTimeLabel(self):
     self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
     if debug:
-      self.refresh_time_label.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
+      self.refresh_time_label.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;")
     else:
-      self.refresh_time_label.setStyleSheet(f"color:{legend_color};")
+      self.refresh_time_label.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color};")
     font = QFont()
     font.setPointSize(update_font_size)
     self.refresh_time_label.setFont(font)
     self.refresh_time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-    self.refresh_time_label.setStyleSheet(f"background-color: rgba(0, 0, 0, 0);")
     return self.refresh_time_label
 
   def updateRefreshTimeLabel(self):
@@ -325,11 +323,11 @@ class ChartWindow(QMainWindow):
   def titleWidget(self):
     if debug:
       title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
-      title.setStyleSheet(f"color:{legend_color}; border: 1px solid red;")
+      title.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;")
     else:
       #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
       title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
-      title.setStyleSheet(f"color:{legend_color};")
+      title.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color};")
     font = QFont()
     font.setPointSize(title_font_size)
     title.setFont(font)
@@ -414,7 +412,7 @@ class ChartWindow(QMainWindow):
         self.drag_start_position = event.globalPosition().toPoint()
 
   def blurBackground(self):
-    # GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
+    #GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
     GlobalBlur(self.winId(), Dark=True, Acrylic=False, QWidget=self)
     # self.setStyleSheet("background-color: lightgrey")
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
