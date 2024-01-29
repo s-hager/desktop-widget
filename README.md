@@ -66,7 +66,7 @@ pip install pandas-2.2.0-cp312-cp312-macosx_10_9_x86_64.whl --force-reinstall
 --> PANDAS REINSTALLS NUMPY SO NEED TO INSTALL THAT FUSED WHEEL AGAIN
 
 remove from quarantine:
-xrandr -d com.apple.quarantiney23
+xattr -d com.apple.quarantine /Applications/StockWidget.app
 
 scp -P 2222 -r stefan@localhost:/Users/stefan/dev/desktop-widget/dist/blur_macos_ns.app ~/dev/desktop-widget-bin
 
