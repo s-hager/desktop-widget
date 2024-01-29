@@ -72,6 +72,8 @@ scp -P 2222 -r stefan@localhost:/Users/stefan/dev/desktop-widget/dist/blur_macos
 
 scp -P 2222 -r stefan@localhost:/Users/stefan/dev/desktop-widget/dist/blur_macos_lib.app ~/dev/desktop-widget-bin
 
+scp -P 2222 -r stefan@localhost:/Users/stefan/dev/desktop-widget/dist/StockWidget.dmg ~/dev/desktop-widget/dist/StockWidget.dmg
+
 ### then rebuild with
 pyinstaller app.spec
 pyinstaller StockWidget.spec
