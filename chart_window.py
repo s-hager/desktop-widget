@@ -9,7 +9,7 @@ from BlurWindow.blurWindow import GlobalBlur
 # from matplotlib.ticker import Formatter, FixedLocator
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -280,6 +280,29 @@ class ChartWindow(QMainWindow):
         self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
         self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+        last_close_date = self.data['Datetime'].iloc[-1].strftime("%Y-%m-%d")
+        previous_close_date = datetime.strptime(last_close_date, "%Y-%m-%d")
+        previous_close_date = (previous_close_date - timedelta(days=1)).strftime("%Y-%m-%d")
+        # print(last_close_date)
+        # print(previous_close_date)
+        last_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == last_close_date]
+        previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
+        print(last_close_data)
+        print(previous_close_data)
+        last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
+        open_value_after_last_nonzero = last_close_data.loc[last_nonzero_index + 1, 'Open']
+        last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+        print(open_value_after_last_nonzero)
+        previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+        # print(last_close_data)
+        last_close_value = round(float(last_close_data['Close'].iloc[-1]), 2)
+        previous_close_value = round(float(previous_close_data['Close'].iloc[-1]), 2)
+        print(last_close_value)
+        print(previous_close_value)
+        percentage_increase = ((last_close_value - previous_close_value) / previous_close_value) * 100
+
+        print(f"{percentage_increase:.2f}%")
+        print(percentage_increase)
         # print(type(self.data['Datetime']))
         # print(self.data['Datetime'])
         break
