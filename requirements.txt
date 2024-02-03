@@ -9,14 +9,14 @@ html5lib==1.1
 idna==3.4
 lxml==4.9.3
 multitasking==0.0.11
-numpy==1.26.0
+numpy==1.26.3
 packaging==23.2
 pandas==2.1.1
 peewee==3.16.3
 pefile==2023.2.7
 Pillow==10.0.1
-pyinstaller==6.0.0
-pyinstaller-hooks-contrib==2023.9
+pyinstaller==6.3.0
+pyinstaller-hooks-contrib==2024.0
 PyQt6==6.5.2
 PyQt6-Qt6==6.5.2
 PyQt6-sip==13.5.2
@@ -30,4 +30,8 @@ soupsieve==2.5
 tzdata==2023.3
 urllib3==2.0.5
 webencodings==0.5.1
-yfinance==0.2.32
+yfinance==0.2.36
+pyobjc==10.1
+#PyQt5 conflicts with pyqt6
+# PyQt5==5.15.10 
+# to install universal2 ver, need to install with python3 -m pip inst... (to make sure universal2 python ver is used)
