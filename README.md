@@ -37,7 +37,7 @@ python main.py
 # macos:
 `pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:."`
 
-for arm and x86:
+for arm and x86 (probably need to build universal2 wheels first (below)):
 `pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:." --target-arch=universal2`
 
 ### test builds
@@ -64,6 +64,18 @@ delocate-fuse pandas-2.2.0-cp312-cp312-macosx_10_9_x86_64.whl pandas-2.2.0-cp312
 --> pandas-2.2.0-cp312-cp312-macosx_10_9_x86_64.whl is fused wheel
 pip install pandas-2.2.0-cp312-cp312-macosx_10_9_x86_64.whl --force-reinstall
 --> PANDAS REINSTALLS NUMPY SO NEED TO INSTALL THAT FUSED WHEEL AGAIN
+build own universal2 PyQt6-Qt6 wheel:
+pip install delocate
+wget https://files.pythonhosted.org/packages/b6/bf/94ce06e5f2e36a6ea7ead39fa63db6b1cc91e2aa51768e7fdcd296d0d2b0/PyQt6_Qt6-6.6.1-py3-none-macosx_11_0_arm64.whl &&
+wget https://files.pythonhosted.org/packages/0a/01/70d5341b9b26104bf31bb52704bcce7bee367991151a3754e4b5faefd248/PyQt6_Qt6-6.6.1-py3-none-macosx_10_14_x86_64.whl
+mkdir pyqt6
+delocate-fuse PyQt6_Qt6-6.6.1-py3-none-macosx_10_14_x86_64.whl PyQt6_Qt6-6.6.1-py3-none-macosx_11_0_arm64.whl -w pyqt6
+--> results in arm64 (universal2 not currently working for this lib)
+delocate-fuse PyQt6_Qt6-6.6.1-py3-none-macosx_11_0_arm64.whl PyQt6_Qt6-6.6.1-py3-none-macosx_10_14_x86_64.whl -w pyqt6
+--> results in x86_64 (universal2 not currently working for this lib)
+check if if worked: file Qt6/lib/QtCore.framework/Versions/A/QtCore
+--> PyQt6_Qt6-6.6.1-py3-none-macosx_10_14_x86_64.whl is fused wheel
+pip install PyQt6_Qt6-6.6.1-py3-none-macosx_10_14_x86_64.whl --force-reinstall
 
 remove from quarantine:
 xattr -d com.apple.quarantine /Applications/StockWidget.app
