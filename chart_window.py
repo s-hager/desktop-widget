@@ -9,7 +9,7 @@ from BlurWindow.blurWindow import GlobalBlur
 # from matplotlib.ticker import Formatter, FixedLocator
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -163,10 +163,6 @@ class ChartWindow(QMainWindow):
     
     self.downloadStockData()
 
-    # Get stock currency
-    self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
-    # self.currency_symbol = yf.Ticker(self.stock_symbol).info["currency"]
-
     # Add the title bar and canvas to a vertical layout
 
     self.title_widget = self.titleWidget()
@@ -280,6 +276,46 @@ class ChartWindow(QMainWindow):
         self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
         self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
+        last_close_date = self.data['Datetime'].iloc[-1].strftime("%Y-%m-%d")
+        previous_close_date = datetime.strptime(last_close_date, "%Y-%m-%d")
+        previous_close_date = (previous_close_date - timedelta(days=1)).strftime("%Y-%m-%d")
+        # print(last_close_date)
+        # print(previous_close_date)
+        last_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == last_close_date]
+        previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
+        # print(last_close_data)
+        # print(previous_close_data)
+        last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
+        previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
+        last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
+        previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
+        # print(last_close_open_value_after_last_nonzero)
+        # print(previous_close_open_value_after_last_nonzero)
+        #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+        #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+        # print(last_close_data)
+        # last_close_value = round(last_close_open_value_after_last_nonzero, 2)
+        # last_close_value = last_close_open_value_after_last_nonzero
+        # previous_close_value = round(previous_close_open_value_after_last_nonzero, 2)
+        # previous_close_value = previous_close_open_value_after_last_nonzero
+
+        # Get stock currency
+        self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
+        # self.currency_symbol = yf.Ticker(self.stock_symbol).info["currency"]
+
+        logging.info(f"{self.stock_symbol} Open:  {self.currency_symbol}{last_close_value}")
+        logging.info(f"{self.stock_symbol} Close: {self.currency_symbol}{previous_close_value}")
+        # print(last_close_value)
+        # print(previous_close_value)
+        self.percentage_increase = ((last_close_value - previous_close_value) / previous_close_value) * 100
+        self.increase_symbol = '+' if self.percentage_increase >= 0 else ''
+        logging.info(f"{self.stock_symbol} Increase: {self.increase_symbol}{self.percentage_increase:.2f}%")
+
+        self.current_price = self.data['Close'].iloc[-1]
+        self.close_price = last_close_value
+
+        # print(f"{self.percentage_increase:.2f}%")
+        # print(self.percentage_increase)
         # print(type(self.data['Datetime']))
         # print(self.data['Datetime'])
         break
@@ -321,13 +357,26 @@ class ChartWindow(QMainWindow):
     logging.info(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
+    if self.percentage_increase >= 0:
+      text_color = chart_line_color_positive
+    else:
+      text_color = chart_line_color_negative
     if debug:
-      title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f} {self.window_id}")
-      title.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;")
+      text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                 <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
+                 <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}% {self.window_id}</font>
+                 <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+      stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
     else:
       #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
-      title = QLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
-      title.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color};")
+      text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                 <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
+                 <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}%</font>
+                 <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+      stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
+    title = QLabel()
+    title.setStyleSheet(stylesheet)
+    title.setText(text)
     font = QFont()
     font.setPointSize(title_font_size)
     title.setFont(font)
@@ -342,7 +391,7 @@ class ChartWindow(QMainWindow):
     self.refresh_timer.timeout.connect(self.downloadStockData)
     self.refresh_timer.timeout.connect(self.plotStock)
     self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
-    self.refresh_timer.timeout.connect(lambda: logging.info("Done"))
+    self.refresh_timer.timeout.connect(lambda: logging.info("Done Refreshing Plot"))
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
