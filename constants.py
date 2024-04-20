@@ -8,4 +8,6 @@ settings = QSettings(appDirectoryPath("config.ini"), QSettings.Format.IniFormat)
 # window_id_counter = 0
 # windows = []
 app_icon = resourcePath("icon.png")
+locked_icon = resourcePath("locked.png")
+unlocked_icon = resourcePath("unlocked.png")
 ### ------------------------------------------------------------------------ ###

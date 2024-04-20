@@ -120,7 +120,7 @@ class SettingsWindow(QMainWindow):
       self.window_layout.addWidget(label)
 
       self.lock_button = QPushButton()
-      self.lock_button.setIcon(QIcon(resourcePath("locked.png")))
+      self.lock_button.setIcon(QIcon(locked_icon))
       self.lock_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
       self.lock_button.clicked.connect(self.toggleLock)
       # Add a button next to the label
@@ -157,7 +157,7 @@ class SettingsWindow(QMainWindow):
       if self.window.drag_resize:
         logging.info(f"Unlocking Window with id {self.window_id}")
         self.window.toggleCrosshair()
-        self.lock_button.setIcon(QIcon(resourcePath("unlocked.png")))
+        self.lock_button.setIcon(QIcon(unlocked_icon))
         self.window.showResizeGrips()
         self.window.positionGrips()
         self.window.setFixedSize(16777215, 16777215) # reset constraints set by setFixedSize() cant get QWIDGETSIZE_MAX to work
@@ -169,7 +169,7 @@ class SettingsWindow(QMainWindow):
           self.window.central_widget.setStyleSheet("border: 1px solid red;") # add debug border again
         else:
           self.window.central_widget.setStyleSheet("QWidget#central_widget { }") # remove border
-        self.lock_button.setIcon(QIcon(resourcePath("locked.png")))
+        self.lock_button.setIcon(QIcon(locked_icon))
         self.window.savePositionAndSize()
         self.window.hideResizeGrips()
         self.window.setFixedSize(self.window.size())
