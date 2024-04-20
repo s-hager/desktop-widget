@@ -30,7 +30,7 @@ soupsieve==2.5
 tzdata==2023.3
 urllib3==2.2.1
 webencodings==0.5.1
-yfinance==0.2.36
+yfinance==0.2.38
 pyobjc==10.1; sys_platform == 'darwin' # MacOS only
 #PyQt5 conflicts with pyqt6
 # PyQt5==5.15.10 
