@@ -22,29 +22,29 @@ python main.py
 
 `pyinstaller app.py --onefile --paths=./venv/lib/site-packages --add-data "icon.ico;."`
 
-`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --add-data "icon.png;." --add-data "locked.png;." --add-data "unlocked.png;."`
+`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --add-data "assets/icon.png;." --add-data "assets/locked.png;." --add-data "assets/unlocked.png;."`
 
-`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --icon=icon.png --add-data "icon.png;." --add-data "locked.png;." --add-data "unlocked.png;."`
+`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --icon=assets/icon.png --add-data "assets/icon.png;." --add-data "assets/locked.png;." --add-data "assets/unlocked.png;."`
 
-`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png;." --add-data "locked.png;." --add-data "unlocked.png;."`
+`pyinstaller app.py --onefile --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png;." --add-data "assets/locked.png;." --add-data "assets/unlocked.png;."`
 
-`pyinstaller app.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png;." --add-data "locked.png;." --add-data "unlocked.png;."`
+`pyinstaller app.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png;." --add-data "assets/locked.png;." --add-data "assets/unlocked.png;."`
 
-`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png;." --add-data "locked.png;." --add-data "unlocked.png;."`
+`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png;." --add-data "assets/locked.png;." --add-data "assets/unlocked.png;."`
 
-`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:."`
+`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:."`
 
 # macos:
-`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:."`
+`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:."`
 
 for arm and x86 (probably need to build universal2 wheels first (below)):
-`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:." --target-arch=universal2`
+`pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:." --target-arch=universal2`
 
 ### test builds
-`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_ns --icon=icon.png --add-data "icon.png:." --target-arch=universal2`
-`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_lib --icon=icon.png --add-data "icon.png:." --target-arch=universal2`
-`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_lib --icon=icon.png --add-data "icon.png:."`
-`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_ns --icon=icon.png --add-data "icon.png:."`
+`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_ns --icon=assets/icon.png --add-data "assets/icon.png:." --target-arch=universal2`
+`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_lib --icon=assets/icon.png --add-data "assets/icon.png:." --target-arch=universal2`
+`pyinstaller blur_macos_lib.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_lib --icon=assets/icon.png --add-data "assets/icon.png:."`
+`pyinstaller blur_macos_ns.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=blur_macos_ns --icon=assets/icon.png --add-data "assets/icon.png:."`
 
 not working because numpy does not provide universal2 wheels:
 `python3.12 -m pip install numpy --platform=universal2 --target=venv/lib/python3.12/site-packages/ --no-deps --upgrade`

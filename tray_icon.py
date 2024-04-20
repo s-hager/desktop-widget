@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
+from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QMessageBox
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QIcon, QAction, QCursor
 import logging
@@ -104,3 +104,9 @@ class TrayIcon:
       self.settings_window.show()
       self.settings_window.activateWindow()
       # QMessageBox.critical(self, "Error", "A Settings Window is already open.")
+
+  def criticalMessageBox(self, title, text):
+    # QMessageBox.critical(None, title, text)
+    message_box = QMessageBox(QMessageBox.Icon.Critical, title, text)
+    message_box.setWindowIcon(QIcon(app_icon))
+    message_box.exec()

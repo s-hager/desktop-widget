@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
-                             QVBoxLayout, QSizePolicy, QMessageBox)
+                             QVBoxLayout, QSizePolicy)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer
 from PyQt6.QtGui import QGuiApplication, QFont
 from BlurWindow.blurWindow import GlobalBlur
@@ -123,11 +123,6 @@ class ChartWindow(QMainWindow):
     self.central_widget.setObjectName("central_widget")
     self.setCentralWidget(self.central_widget)
 
-    logging.info("Blurring Background...")
-    self.blurBackground()
-    logging.info("Done Blurring Background")
-    # self.roundCorners() # TODO
-
     # Create plot
     self.plotWidget = CrosshairPlotWidget(self.initial_crosshair)
     # self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -162,6 +157,11 @@ class ChartWindow(QMainWindow):
     # # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
     self.downloadStockData()
+
+    logging.info("Blurring Background...")
+    self.blurBackground()
+    logging.info("Done Blurring Background")
+    # self.roundCorners() # TODO
 
     # Add the title bar and canvas to a vertical layout
 
@@ -285,9 +285,15 @@ class ChartWindow(QMainWindow):
         previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
         # print(last_close_data)
         # print(previous_close_data)
-        last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
+        nonzero_volume = last_close_data['Volume'] != 0
+        # print(last_close_data[nonzero_volume])
+        self.last_close_last_nonzero_index = last_close_data.index[nonzero_volume].max()
+        self.last_close_first_nonzero_data = last_close_data.index[nonzero_volume].min()
         previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
-        last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
+        if (self.last_close_last_nonzero_index + 1 > last_close_data.index.max()):
+          last_close_value = last_close_data.loc[self.last_close_last_nonzero_index, 'Open']
+        else:
+          last_close_value = last_close_data.loc[self.last_close_last_nonzero_index + 1, 'Open']
         previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
         # print(last_close_open_value_after_last_nonzero)
         # print(previous_close_open_value_after_last_nonzero)
@@ -320,14 +326,14 @@ class ChartWindow(QMainWindow):
         # print(self.data['Datetime'])
         break
       except Exception as e:
-        logging.info(f"An exception occured: {e}")
+        logging.info(f"An exception of type {type(e).__name__} occured: {e}")
         logging.info(f"Download Attempt {try_counter + 1} failed.")
         logging.info("Retrying in 1 second...")
         time.sleep(1)
       try_counter += 1
     if try_counter == retries:
-      QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
       logging.info("Could not download stock data after 5 tries.")
+      self.tray_icon.criticalMessageBox("Error", "Could not download stock data after 5 tries.")
 
   def replaceCurrencySymbols(self, text):
     currency_symbols = {
@@ -603,14 +609,41 @@ class ChartWindow(QMainWindow):
     if positive_chart:
         chart_line_color = chart_line_color_negative
         chart_area_color = chart_area_color_negative_trans
+        chart_highlight_line_color = chart_highlight_line_color_negative
+        chart_highlight_area_color = chart_highlight_area_color_negative_trans
     else:
         chart_line_color = chart_line_color_positive
         chart_area_color = chart_area_color_positive_trans
+        chart_highlight_line_color = chart_highlight_line_color_positive
+        chart_highlight_area_color = chart_highlight_area_color_positive_trans
 
     # Fill the area below the stock price line with a color
     if area_chart:
+      x_before = x[:self.last_close_first_nonzero_data]
+      x_after = x[self.last_close_last_nonzero_index + 1:]
+      y_before = y[:self.last_close_first_nonzero_data]
+      y_after = y[self.last_close_last_nonzero_index + 1:]
+      x_segmented = np.concatenate([x_before, x_after])
+      y_segmented = np.concatenate([y_before, y_after])
+      x_nan_filled = np.full_like(x_segmented, np.nan)
+      x_nan_filled[:len(x_before)] = x_before
+      x_nan_filled[len(x_before) + len(x_after):] = x_after
+      y_nan_filled = np.full_like(y_segmented, np.nan)
+      y_nan_filled[:len(y_before)] = y_before
+      y_nan_filled[len(y_before) + len(y_after):] = y_after
+
       # TODO: the y "limits" are not being set correctly
-      self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=0, brush=chart_area_color)
+      self.plotItem.plot(x=x_nan_filled, # filter out the highlighted areas
+                         y=y_nan_filled, # filter out the highlighted areas
+                         pen=pg.mkPen(color=chart_line_color, width=1),
+                         fillLevel=0,
+                         brush=chart_area_color)
+      # x_last_open_day = x[self.last_close_first_nonzero_data:self.last_close_last_nonzero_index + 1]
+      # y_last_open_day = y.tolist()[self.last_close_first_nonzero_data:self.last_close_last_nonzero_index + 1]
+      mask = slice(self.last_close_first_nonzero_data, self.last_close_last_nonzero_index + 1)
+      print(mask)
+      # Highlight the last open market day
+      self.plotItem.plot(x=x[mask], y=y.tolist()[mask], pen=pg.mkPen(color=chart_highlight_line_color, width=1), fillLevel=0, brush=chart_highlight_area_color)
       self.plotWidget.setYRange(min(self.data['Close']), max(self.data['Close']))
       # self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
     else:

@@ -1,9 +1,10 @@
-from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
-                             QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
-                             QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
-from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
-from BlurWindow.blurWindow import GlobalBlur
+from PyQt6.QtWidgets import QApplication
+# from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
+#                              QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
+#                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
+# from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
+# from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
+# from BlurWindow.blurWindow import GlobalBlur
 import sys
 import signal
 import time
