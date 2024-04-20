@@ -2,13 +2,16 @@
 
 desktop-widget is a stock chart widget app for the desktop.
 
-- data from yahoo finance (yfinance) - support for stocks / etfs / crypto / ...
-- 1 month timeframe
+- data from [yahoo finance](https://finance.yahoo.com/) ([yfinance](https://github.com/ranaroussi/yfinance)) - support for stocks / etfs / crypto / ...
 - automatic startup with windows
 - "bought-at" price on chart
 - blurred background
-- fast rendering using pyqtgraph
+- fast rendering using [pyqtgraph](https://github.com/pyqtgraph/pyqtgraph)
+- 1 month timeframe
+- daily percentage change
 - tray icon for settings
+
+![screenshot](screenshot.png)
 
 ## Development
 
@@ -16,7 +19,7 @@ desktop-widget is a stock chart widget app for the desktop.
 - activate venv (linux/macos) `source venv/bin/activate`
 - activate venv (windows) `venv\Scripts\activate`
 - install requirements `pip install -r requirements.txt` or `python3 -m pip install -r requirements.txt`
-- run app with: `python src/main.py`
+- run app with: `python main.py`
 
 ### Class Overview
 
