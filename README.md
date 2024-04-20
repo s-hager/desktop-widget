@@ -21,6 +21,15 @@ desktop-widget is a stock chart widget app for the desktop.
 - install requirements `pip install -r requirements.txt` or `python3 -m pip install -r requirements.txt`
 - run app with: `python main.py`
 
+### Libraries
+
+- PyQt6
+- pyqtgraph
+- yfinance
+- numpy
+- pandas
+- BlurWindow
+
 ### Class Overview
 
 ![classes](classes.png)
