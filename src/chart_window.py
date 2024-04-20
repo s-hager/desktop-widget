@@ -18,7 +18,7 @@ import time
 import calendar
 import sys
 
-import MyQLabel #TODO WIP
+import dev_sandbox.MyQLabel as MyQLabel #TODO WIP
 
 # own variables:
 from config import *

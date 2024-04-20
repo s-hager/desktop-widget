@@ -36,6 +36,8 @@ python main.py
 
 `pyinstaller main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:."`
 
+`pyinstaller src/main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:."`
+
 # macos:
 `pyinstaller main.py --onefile --noconsole --paths=./venv/lib/python3.12/site-packages --name=StockWidget --icon=icon.png --add-data "icon.png:." --add-data "locked.png:." --add-data "unlocked.png:."`
 
