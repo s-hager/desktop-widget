@@ -48,7 +48,7 @@ class SettingsWindow(QMainWindow):
     self.layout.addWidget(self.launch_on_startup_checkbox)
 
     self.settings_stock_layouts = []
-    self.addOpenWindows()
+    # self.addOpenWindows()
 
     central_widget = QWidget()
     central_widget.setLayout(self.layout)
@@ -267,8 +267,8 @@ class SettingsWindow(QMainWindow):
         settings_stock_layout.toggleLock()
     
     # Overriding closeEvent to hide the window instead of closing it
-    # self.hide()
-    self.destroy()
+    self.hide()
+    # self.destroy()
     event.ignore() # ignore close event (would cause program to exit)
     logging.info("Closed Settings")
     self.close_settings_signal.emit()  # Emit custom signal

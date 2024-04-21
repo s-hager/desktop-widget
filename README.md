@@ -16,8 +16,8 @@ desktop-widget is a stock chart widget app for the desktop.
 ## Development
 
 - create venv `python3 -m venv venv`
-- activate venv (linux/macos) `source venv/bin/activate`
 - activate venv (windows) `venv\Scripts\activate`
+- activate venv (linux/macos) `source venv/bin/activate`
 - install requirements `pip install -r requirements.txt` or `python3 -m pip install -r requirements.txt`
 - run app with: `python main.py`
 

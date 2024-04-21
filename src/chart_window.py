@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
-                             QVBoxLayout, QSizePolicy, QMessageBox)
+                             QVBoxLayout, QSizePolicy)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer
 from PyQt6.QtGui import QGuiApplication, QFont
 from BlurWindow.blurWindow import GlobalBlur
@@ -266,7 +266,7 @@ class ChartWindow(QMainWindow):
 
   def downloadStockData(self):
     # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-    logging.info("Downloading Stock Data...")
+    logging.info(f"Downloading Stock Data for {self.stock_symbol}...")
       # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
     # else:
     try_counter = 0
@@ -326,8 +326,11 @@ class ChartWindow(QMainWindow):
         time.sleep(1)
       try_counter += 1
     if try_counter == retries:
-      QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
-      logging.info("Could not download stock data after 5 tries.")
+      # self.setWindowIcon(QIcon(app_icon))
+      # QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
+      error = f"Could not download stock data for {self.stock_symbol} after 5 tries."
+      logging.info(error)
+      raise RuntimeError(error)
 
   def replaceCurrencySymbols(self, text):
     currency_symbols = {
