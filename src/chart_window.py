@@ -98,26 +98,6 @@ class ChartWindow(QMainWindow):
     self.drag_resize = False
     # disable resizing
 
-    # Load settings from config file and move window
-    self.settings_position = settings.value(f"{self.window_id}_pos", type=QPoint)
-    self.settings_size = settings.value(f"{self.window_id}_size", type=QSize)
-    if self.settings_position.isNull() or self.settings_size.isEmpty():
-      # Center the window on the screen
-      self.resize(size_relative_to_screen)
-      self.centerWindow() # order matters -> after resize
-      settings.setValue(f"{self.window_id}_pos", QPoint(self.centered_position))
-      settings.setValue(f"{self.window_id}_size", QSize(size_relative_to_screen))
-      self.setFixedSize(size_relative_to_screen)
-    else:
-      self.resize(self.settings_size)
-      self.move(self.settings_position)
-      self.setFixedSize(self.settings_size)
-    self.setWindowTitle(f"{self.window_id}")
-    if sys.platform.startswith('darwin'):
-      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.FramelessWindowHint)
-    else:
-      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
-
     # Create a central widget to hold the layout
     self.central_widget = QWidget()
     self.central_widget.setObjectName("central_widget")
@@ -160,6 +140,26 @@ class ChartWindow(QMainWindow):
     # # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
     self.downloadStockData()
+
+    # Load settings from config file and move window
+    self.settings_position = settings.value(f"{self.window_id}_pos", type=QPoint)
+    self.settings_size = settings.value(f"{self.window_id}_size", type=QSize)
+    if self.settings_position.isNull() or self.settings_size.isEmpty():
+      # Center the window on the screen
+      self.resize(size_relative_to_screen)
+      self.centerWindow() # order matters -> after resize
+      settings.setValue(f"{self.window_id}_pos", QPoint(self.centered_position))
+      settings.setValue(f"{self.window_id}_size", QSize(size_relative_to_screen))
+      self.setFixedSize(size_relative_to_screen)
+    else:
+      self.resize(self.settings_size)
+      self.move(self.settings_position)
+      self.setFixedSize(self.settings_size)
+    self.setWindowTitle(f"{self.window_id}")
+    if sys.platform.startswith('darwin'):
+      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.FramelessWindowHint)
+    else:
+      self.setWindowFlag(Qt.WindowType.WindowStaysOnBottomHint | Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
 
     # Add the title bar and canvas to a vertical layout
 
@@ -285,18 +285,14 @@ class ChartWindow(QMainWindow):
         # print(previous_close_data)
         last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
         previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
-        print("HERE1")
-        print(last_close_data)
-        print(len(last_close_data))
-        print(last_close_last_nonzero_index)
         try:
           last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
         except Exception as e:
           last_close_value = last_close_data.loc[last_close_last_nonzero_index, 'Open']
-        print("HERE2")
-        print(previous_close_last_nonzero_index)
-        previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
-        print(previous_close_value)
+        try:
+          previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
+        except Exception as e:
+          previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index, 'Open']
         #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
         #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
         # print(last_close_data)
@@ -370,18 +366,28 @@ class ChartWindow(QMainWindow):
     else:
       text_color = chart_line_color_negative
     if debug:
-      text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                 <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
-                 <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}% {self.window_id}</font>
-                 <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-      stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
+      if percentage_change:
+        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                   <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
+                   <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}% {self.window_id}</font>
+                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
+      else:
+        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
     else:
-      #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
-      text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                 <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
-                 <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}%</font>
-                 <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-      stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
+      if percentage_change:
+        #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
+        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                   <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
+                   <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}%</font>
+                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
+      else:
+        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
+                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
+        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
     title = QLabel()
     title.setStyleSheet(stylesheet)
     title.setText(text)

@@ -7,7 +7,7 @@ from utils import appDirectoryPath, resourcePath
 settings = QSettings(appDirectoryPath("config.ini"), QSettings.Format.IniFormat)
 # window_id_counter = 0
 # windows = []
-app_icon = resourcePath("../assets/icon.png")
-locked_icon = resourcePath("../assets/locked.png")
-unlocked_icon = resourcePath("../assets/unlocked.png")
+app_icon = resourcePath("./assets/icon.png")
+locked_icon = resourcePath("./assets/locked.png")
+unlocked_icon = resourcePath("./assets/unlocked.png")
 ### ------------------------------------------------------------------------ ###

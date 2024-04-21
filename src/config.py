@@ -11,6 +11,7 @@ chart_area_color_negative_trans = (255, 0, 0, 20) # used with pyqtgraph
 chart_line_color_positive = '#4ece6f'
 chart_line_color_negative = '#ff2626'
 area_chart = True
+percentage_change = False
 monday_lines = True
 monday_lines_color = 'white'
 monday_lines_style = 'solid' # https://matplotlib.org/stable/gallery/lines_bars_and_markers/linestyles.html
@@ -34,6 +35,6 @@ refresh_interval = 3600 # seconds
 # refresh_interval = 20 # seconds
 window_margins = [10, 10, 10, 10]
 log_to_file = False
-# debug = False # set to False for pyinstaller
-debug = True # set to False for pyinstaller
+debug = False # set to False for pyinstaller
+# debug = True # set to False for pyinstaller
 ### ------------------------------------------------------------------------ ###

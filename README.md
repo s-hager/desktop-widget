@@ -38,7 +38,7 @@ desktop-widget is a stock chart widget app for the desktop.
 
 ### Windows build .exe
 
-`pyinstaller src/main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=assets/icon.png --add-data "assets/icon.png:." --add-data "assets/locked.png:." --add-data "assets/unlocked.png:."`
+`pyinstaller src/main.py --onefile --noconsole --paths=./venv/lib/site-packages --name=StockWidget --icon=src/assets/icon.png --add-data "src/assets:assets"`
 
 #### then rebuild with
 

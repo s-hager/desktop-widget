@@ -42,7 +42,6 @@ from constants import *
 # remove unnecessary resize event(s) at start
 # make resizing smoother
 # base amount of y axis tick labels on window size
-# use createNewChartWindow also at startup
 # fix program closing after waking up from sleep mode
 # fix program behaviour when monitor is connected/disconnected
 

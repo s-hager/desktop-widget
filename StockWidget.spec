@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\main.py'],
     pathex=['./venv/lib/site-packages'],
     binaries=[],
-    datas=[('assets/icon.png', '.'), ('assets/locked.png', '.'), ('assets/unlocked.png', '.')],
+    datas=[('src/assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -34,5 +34,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['assets\\icon.png'],
+    icon=['src\\assets\\icon.png'],
 )
