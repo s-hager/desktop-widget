@@ -8,8 +8,7 @@ desktop-widget is a stock chart widget app for the desktop.
 - blurred background
 - fast rendering using [pyqtgraph](https://github.com/pyqtgraph/pyqtgraph)
 - 1 month timeframe
-- daily percentage change
-- tray icon for settings
+- tray icon for easy settings access
 
 ![screenshot](screenshot.png)
 
@@ -23,12 +22,12 @@ desktop-widget is a stock chart widget app for the desktop.
 
 ### Libraries
 
-- PyQt6
-- pyqtgraph
-- yfinance
-- numpy
-- pandas
-- BlurWindow
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/)
+- [pyqtgraph](https://github.com/pyqtgraph/pyqtgraph)
+- [yfinance](https://github.com/ranaroussi/yfinance)
+- [numpy](https://github.com/numpy/numpy)
+- [pandas](https://github.com/pandas-dev/pandas)
+- [BlurWindow](https://github.com/Peticali/PythonBlurBehind)
 
 ### Class Overview
 
