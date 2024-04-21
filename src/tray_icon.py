@@ -62,27 +62,23 @@ class TrayIcon:
         self.loadChartFromConfig(key)
     logging.info("Done Showing all windows")
     
-    self.settings_window.addOpenWindows()
+    # self.settings_window.addOpenWindows()
 
     # Open Settings if no charts were created
     if not self.windows:
       self.openSettingsWindow()
 
   def loadChartFromConfig(self, key):
-    window_symbol = settings.value(key).upper()
+    stock_symbol = settings.value(key).upper()
     window_id = int(re.findall(r"^window_(\d+)_[^_]+$", key)[0])
     if window_id > self.window_id_counter:
       self.window_id_counter = window_id
-    try:
-      window = ChartWindow(self, window_symbol, window_id)
-    except Exception as e:
-      QMessageBox.critical(self.settings_window, "Error", str(e))
-      return
-    logging.info(f"Showing Window with id {window_id}")
-    window.applyConfig() # load windows' settings from config
-    window.show()
-    window.plotStock()
-    self.windows.append(window)
+    # window = ChartWindow(self, window_symbol, window_id)
+    window = self.settings_window.createChartWindow(self, stock_symbol, window_id)
+    if (window):
+      window.applyConfig() # load windows' settings from config
+      window.show()
+      logging.info(f"Showing Window with id {window_id}")
 
   def quitApp(self):
     logging.info("Quitting Application")

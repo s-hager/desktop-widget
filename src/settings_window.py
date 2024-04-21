@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QLabel, QWidget, 
                              QVBoxLayout, QSizePolicy, QCheckBox, 
                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
-from PyQt6.QtCore import QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QIcon
 import sys
 if 'nt' in sys.builtin_module_names:
@@ -61,13 +61,13 @@ class SettingsWindow(QMainWindow):
                                     int(0))
     self.resize(size_relative_to_screen)
 
-  def addOpenWindows(self):
-    # self.clearLayout(self.window_layout)
-    for window in self.tray_icon.windows:
-      # Add the QHBoxLayout for this window to the main QVBoxLayout
-      new_settings_stock_object = self.SettingsStockLayout(self, window)
-      self.settings_stock_layouts.append(new_settings_stock_object)
-      self.layout.addLayout(new_settings_stock_object.getLayout())
+  # def addOpenWindows(self):
+  #   # self.clearLayout(self.window_layout)
+  #   for window in self.tray_icon.windows:
+  #     # Add the QHBoxLayout for this window to the main QVBoxLayout
+  #     new_settings_stock_object = self.SettingsStockLayout(self, window)
+  #     self.settings_stock_layouts.append(new_settings_stock_object)
+  #     self.layout.addLayout(new_settings_stock_object.getLayout())
 
     # previous_old_id = None
     # previous_new_id = None
@@ -91,17 +91,36 @@ class SettingsWindow(QMainWindow):
     if not stock_symbol:
       QMessageBox.critical(self, "Error", "Stock Symbol cannot be empty.")
     else:
-      self.textbox.clear() # clear user input from textbox
-      self.tray_icon.window_id_counter += 1
-      window_id = self.tray_icon.window_id_counter
-      settings.setValue(f"window_{window_id}_symbol", stock_symbol)
-      new_window = ChartWindow(self.tray_icon, stock_symbol, window_id)
-      new_window.show()
-      new_window.plotStock()
-      self.tray_icon.windows.append(new_window)
-      new_settings_stock_object = self.SettingsStockLayout(self, new_window)
-      self.settings_stock_layouts.append(new_settings_stock_object)
-      self.layout.addLayout(new_settings_stock_object.getLayout())
+      window_id = self.tray_icon.window_id_counter + 1
+      window = self.createChartWindow(self.tray_icon, stock_symbol, window_id)
+      if (window):
+        self.textbox.clear() # clear user input from textbox
+        self.tray_icon.window_id_counter += 1
+        settings.setValue(f"window_{window_id}_symbol", stock_symbol)
+        window.show()
+
+  def createChartWindow(self, tray_icon, stock_symbol, window_id):
+    try:
+      window = ChartWindow(tray_icon, stock_symbol, window_id)
+    except Exception as e:
+      logging.info(e)
+      # QMessageBox.critical(self, "Error", str(e))
+      msg_box = QMessageBox(self)
+      msg_box.setIcon(QMessageBox.Icon.Critical)
+      msg_box.setWindowTitle("Error")
+      msg_box.setText(str(e))
+      # msg_box.activateWindow() # make sure window is on top
+      msg_box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+      # msg_box.exec() # wait for user to click ok before continuing
+      msg_box.show() # continue straight away
+      return
+    window.plotStock()
+    tray_icon.windows.append(window)
+    settings_stock_object = self.SettingsStockLayout(self, window)
+    self.settings_stock_layouts.append(settings_stock_object)
+    self.layout.addLayout(settings_stock_object.getLayout())
+    # window.show()
+    return window
 
   class SettingsStockLayout(QHBoxLayout):
     def __init__(self, settings, window, parent=None):

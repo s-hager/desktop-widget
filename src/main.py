@@ -70,7 +70,6 @@ def main():
   logging.info("Creating Application...")
   app = QApplication(sys.argv)
   logging.info("Done Creating Application")
-  # windows = [ChartWindow(), ChartWindow(), ChartWindow()]
   
   logging.info("Creating Tray Icon...")
   from tray_icon import TrayIcon

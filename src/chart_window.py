@@ -123,9 +123,7 @@ class ChartWindow(QMainWindow):
     self.central_widget.setObjectName("central_widget")
     self.setCentralWidget(self.central_widget)
 
-    logging.info("Blurring Background...")
     self.blurBackground()
-    logging.info("Done Blurring Background")
     # self.roundCorners() # TODO
 
     # Create plot
@@ -287,10 +285,18 @@ class ChartWindow(QMainWindow):
         # print(previous_close_data)
         last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
         previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
-        last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
+        print("HERE1")
+        print(last_close_data)
+        print(len(last_close_data))
+        print(last_close_last_nonzero_index)
+        try:
+          last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
+        except Exception as e:
+          last_close_value = last_close_data.loc[last_close_last_nonzero_index, 'Open']
+        print("HERE2")
+        print(previous_close_last_nonzero_index)
         previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
-        # print(last_close_open_value_after_last_nonzero)
-        # print(previous_close_open_value_after_last_nonzero)
+        print(previous_close_value)
         #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
         #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
         # print(last_close_data)
@@ -320,16 +326,15 @@ class ChartWindow(QMainWindow):
         # print(self.data['Datetime'])
         break
       except Exception as e:
-        logging.info(f"An exception occured: {e}")
+        logging.info(f"An exception occured: {str(e)}")
         logging.info(f"Download Attempt {try_counter + 1} failed.")
-        logging.info("Retrying in 1 second...")
-        time.sleep(1)
+        logging.info("Retrying in 0.5 seconds...")
+        time.sleep(0.5)
       try_counter += 1
     if try_counter == retries:
       # self.setWindowIcon(QIcon(app_icon))
       # QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
-      error = f"Could not download stock data for {self.stock_symbol} after 5 tries."
-      logging.info(error)
+      error = f"Could not download stock data for {self.stock_symbol} after {retries} tries."
       raise RuntimeError(error)
 
   def replaceCurrencySymbols(self, text):
@@ -464,11 +469,13 @@ class ChartWindow(QMainWindow):
         self.drag_start_position = event.globalPosition().toPoint()
 
   def blurBackground(self):
+    logging.info("Blurring Background...")
     #GlobalBlur(self.winId(), Dark=True, Acrylic=True, QWidget=self)
     GlobalBlur(self.winId(), Dark=True, Acrylic=False, QWidget=self)
     # self.setStyleSheet("background-color: lightgrey")
     self.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
     self.central_widget.setStyleSheet(f"background-color: rgba{background_color};")
+    logging.info("Done Blurring Background")
 
   def format_y_tick_label(self, value, pos):
     return f"{self.currency_symbol}{value:.2f}"
