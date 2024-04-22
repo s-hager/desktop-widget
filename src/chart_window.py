@@ -274,55 +274,55 @@ class ChartWindow(QMainWindow):
         self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
         self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
-        last_close_date = self.data['Datetime'].iloc[-1].strftime("%Y-%m-%d")
-        previous_close_date = datetime.strptime(last_close_date, "%Y-%m-%d")
-        previous_close_date = (previous_close_date - timedelta(days=1)).strftime("%Y-%m-%d")
-        # print(last_close_date)
-        # print(previous_close_date)
-        last_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == last_close_date]
-        previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
-        # print(last_close_data)
-        # print(previous_close_data)
-        last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
-        previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
-        try:
-          last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
-        except Exception as e:
-          last_close_value = last_close_data.loc[last_close_last_nonzero_index, 'Open']
-        try:
-          previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
-        except Exception as e:
-          previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index, 'Open']
-        #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
-        #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
-        # print(last_close_data)
-        # last_close_value = round(last_close_open_value_after_last_nonzero, 2)
-        # last_close_value = last_close_open_value_after_last_nonzero
-        # previous_close_value = round(previous_close_open_value_after_last_nonzero, 2)
-        # previous_close_value = previous_close_open_value_after_last_nonzero
-
         # Get stock currency
         self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
         # self.currency_symbol = yf.Ticker(self.stock_symbol).info["currency"]
+        if percentage_change:
+          last_close_date = self.data['Datetime'].iloc[-1].strftime("%Y-%m-%d")
+          previous_close_date = datetime.strptime(last_close_date, "%Y-%m-%d")
+          previous_close_date = (previous_close_date - timedelta(days=1)).strftime("%Y-%m-%d")
+          # print(last_close_date)
+          # print(previous_close_date)
+          last_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == last_close_date]
+          previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
+          # print(last_close_data)
+          # print(previous_close_data)
+          last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
+          previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
+          try:
+            last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
+          except Exception as e:
+            last_close_value = last_close_data.loc[last_close_last_nonzero_index, 'Open']
+          try:
+            previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
+          except Exception as e:
+            previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index, 'Open']
+          #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+          #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
+          # print(last_close_data)
+          # last_close_value = round(last_close_open_value_after_last_nonzero, 2)
+          # last_close_value = last_close_open_value_after_last_nonzero
+          # previous_close_value = round(previous_close_open_value_after_last_nonzero, 2)
+          # previous_close_value = previous_close_open_value_after_last_nonzero
 
-        logging.info(f"{self.stock_symbol} Open:  {self.currency_symbol}{last_close_value}")
-        logging.info(f"{self.stock_symbol} Close: {self.currency_symbol}{previous_close_value}")
-        # print(last_close_value)
-        # print(previous_close_value)
-        self.percentage_increase = ((last_close_value - previous_close_value) / previous_close_value) * 100
-        self.increase_symbol = '+' if self.percentage_increase >= 0 else ''
-        logging.info(f"{self.stock_symbol} Increase: {self.increase_symbol}{self.percentage_increase:.2f}%")
+          logging.info(f"{self.stock_symbol} Open:  {self.currency_symbol}{last_close_value}")
+          logging.info(f"{self.stock_symbol} Close: {self.currency_symbol}{previous_close_value}")
+          # print(last_close_value)
+          # print(previous_close_value)
+          self.percentage_increase = ((last_close_value - previous_close_value) / previous_close_value) * 100
+          self.increase_symbol = '+' if self.percentage_increase >= 0 else ''
+          logging.info(f"{self.stock_symbol} Increase: {self.increase_symbol}{self.percentage_increase:.2f}%")
+
+          self.close_price = last_close_value
+          # print(f"{self.percentage_increase:.2f}%")
+          # print(self.percentage_increase)
 
         self.current_price = self.data['Close'].iloc[-1]
-        self.close_price = last_close_value
-
-        # print(f"{self.percentage_increase:.2f}%")
-        # print(self.percentage_increase)
         # print(type(self.data['Datetime']))
         # print(self.data['Datetime'])
         break
       except Exception as e:
-        logging.info(f"An exception occured: {str(e)}")
+        logging.info(f"An exception occurred: {str(e)}")
         logging.info(f"Download Attempt {try_counter + 1} failed.")
         logging.info("Retrying in 0.5 seconds...")
         time.sleep(0.5)
@@ -361,9 +361,9 @@ class ChartWindow(QMainWindow):
     logging.info(f"Updated Refresh Time to {self.update_time}")
 
   def titleWidget(self):
-    if self.percentage_increase >= 0:
+    if percentage_change and self.percentage_increase >= 0:
       text_color = chart_line_color_positive
-    else:
+    elif percentage_change:
       text_color = chart_line_color_negative
     if debug:
       if percentage_change:
