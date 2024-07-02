@@ -1,9 +1,14 @@
+# own files:
+from config import *
+from constants import *
+
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
                              QVBoxLayout, QSystemTrayIcon, QMenu, QSizePolicy, QCheckBox, 
                              QLineEdit, QPushButton, QHBoxLayout, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, QCoreApplication, QSettings, QRectF
 from PyQt6.QtGui import QGuiApplication, QIcon, QAction, QFont, QCursor, QRegion, QPainterPath
-from BlurWindow.blurWindow import GlobalBlur
+if blur_window:
+  from BlurWindow.blurWindow import GlobalBlur
 import sys
 import signal
 import time
@@ -21,10 +26,6 @@ import yfinance as yf
 import logging
 
 import functools
-
-# own files:
-from config import *
-from constants import *
 
 ## TODO
 # remove space from left and right of graph

@@ -1,6 +1,7 @@
 ### -------------------------------- Config -------------------------------- ###
 app_name="StockWidget" # used as name for reg variable for auto startup
 # stock_symbol = "mu"
+blur_window = True
 legend_color = 'white'
 background_color = (0, 0, 0, 0)
 chart_background_color = (0, 0, 0, 0)
