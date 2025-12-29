@@ -1,0 +1,113 @@
+# Example Cargo.toml for Rust rewrite of desktop-widget
+# This file demonstrates the recommended dependencies for rewriting the application in Rust
+
+[package]
+name = "desktop-widget"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# GUI Framework - Choose ONE of the following options:
+
+# Option 1: iced (Declarative, modern UI framework)
+iced = { version = "0.12", features = ["tokio", "image"] }
+# iced_native = "0.12"  # For platform-specific features
+
+# Option 2: egui (Immediate mode UI framework) - Comment out iced if using this
+# egui = "0.25"
+# eframe = { version = "0.25", default-features = true, features = ["default_fonts", "glow"] }
+
+# Option 3: Tauri (Web-based desktop framework) - Comment out others if using this
+# tauri = { version = "1.5", features = ["shell-open", "system-tray"] }
+# serde = { version = "1.0", features = ["derive"] }
+# serde_json = "1.0"
+
+# Plotting/Charting
+plotters = "0.3"
+# plotters-iced = "0.1"  # If using iced
+# Note: If using egui, use built-in egui_plot instead
+
+# Financial Data API
+yahoo-finance-api = "1.2"
+
+# Data Processing
+polars = { version = "0.36", features = ["lazy", "temporal", "dtype-datetime"] }
+ndarray = "0.15"
+
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Date/Time Handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Configuration Management
+confy = "0.5"  # Simple config file management
+# or
+# config = "0.13"  # More advanced config management
+
+# Error Handling
+anyhow = "1.0"      # For application errors
+thiserror = "1.0"   # For library-style error types
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Platform-specific (uncomment as needed)
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_System_Registry",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winreg = "0.51"  # For Windows registry operations (auto-start)
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.25"
+objc = "0.2"
+# core-foundation = "0.9"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific dependencies if needed
+
+[dev-dependencies]
+# Testing utilities
+tokio-test = "0.4"
+
+# For benchmarking
+criterion = "0.5"
+
+[profile.release]
+# Optimize for size and performance
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true  # Strip symbols for smaller binary
+
+[[bin]]
+name = "desktop-widget"
+path = "src/main.rs"
+
+# Optional: Example showing alternative stack with egui
+[package.metadata.alternative-stack-egui]
+comment = "Alternative dependency setup using egui instead of iced"
+egui-dependencies = [
+    "egui = '0.25'",
+    "eframe = { version = '0.25', features = ['default_fonts', 'glow'] }",
+    "# egui_plot is built-in to egui",
+]
+
+# Optional: Example showing alternative stack with Tauri
+[package.metadata.alternative-stack-tauri]
+comment = "Alternative dependency setup using Tauri for web-based UI"
+tauri-dependencies = [
+    "tauri = { version = '1.5', features = ['shell-open', 'system-tray'] }",
+    "# Frontend would be in src-tauri/ using React/Vue/Svelte",
+]
