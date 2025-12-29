@@ -53,8 +53,8 @@ async fn main() -> Result<()> {
 
     // Calculate percentage change
     if quotes.len() >= 2 {
-        let first_close = quotes.first().unwrap().close;
-        let last_close = quotes.last().unwrap().close;
+        let first_close = quotes.first().expect("First quote should exist").close;
+        let last_close = quotes.last().expect("Last quote should exist").close;
         let percentage_change = ((last_close - first_close) / first_close) * 100.0;
         
         println!("\nPercentage change: {:.2}%", percentage_change);

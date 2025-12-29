@@ -43,9 +43,15 @@ fn main() -> Result<()> {
     
     // Calculate statistics
     println!("\nStatistics:");
-    println!("Min close: {:.2}", close_series.min::<f64>().unwrap());
-    println!("Max close: {:.2}", close_series.max::<f64>().unwrap());
-    println!("Mean close: {:.2}", close_series.mean().unwrap());
+    if let Some(min_val) = close_series.min::<f64>() {
+        println!("Min close: {:.2}", min_val);
+    }
+    if let Some(max_val) = close_series.max::<f64>() {
+        println!("Max close: {:.2}", max_val);
+    }
+    if let Some(mean_val) = close_series.mean() {
+        println!("Mean close: {:.2}", mean_val);
+    }
     
     // Filter data (similar to df[df['volume'] > 1000000])
     let high_volume_df = df.clone().lazy()
