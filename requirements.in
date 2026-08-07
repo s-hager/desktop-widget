@@ -1,0 +1,11 @@
+BlurWindow
+numpy
+pandas
+pyinstaller
+PyQt6
+pyqtgraph
+yfinance
+pyobjc==10.1; sys_platform == 'darwin' # MacOS only
+#PyQt5 conflicts with pyqt6
+# PyQt5==5.15.10 
+# to install universal2 ver, need to install with python3 -m pip inst... (to make sure universal2 python ver is used)

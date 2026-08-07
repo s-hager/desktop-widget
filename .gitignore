@@ -1,7 +1,7 @@
 build
 dist
 old_builds
-venv
+.venv
 __pycache__
 *.log
 EXCEPTION.png

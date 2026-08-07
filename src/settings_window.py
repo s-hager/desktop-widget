@@ -100,20 +100,21 @@ class SettingsWindow(QMainWindow):
         window.show()
 
   def createChartWindow(self, tray_icon, stock_symbol, window_id):
-    try:
-      window = ChartWindow(tray_icon, stock_symbol, window_id)
-    except Exception as e:
-      logging.info(e)
-      # QMessageBox.critical(self, "Error", str(e))
-      msg_box = QMessageBox(self)
-      msg_box.setIcon(QMessageBox.Icon.Critical)
-      msg_box.setWindowTitle("Error")
-      msg_box.setText(str(e))
-      # msg_box.activateWindow() # make sure window is on top
-      msg_box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
-      # msg_box.exec() # wait for user to click ok before continuing
-      msg_box.show() # continue straight away
-      return
+    # try:
+    window = ChartWindow(tray_icon, stock_symbol, window_id)
+    # except Exception as e:
+    #   print(e)
+    #   logging.info(f"{repr(e)}")
+    #   # QMessageBox.critical(self, "Error", str(e))
+    #   msg_box = QMessageBox(self)
+    #   msg_box.setIcon(QMessageBox.Icon.Critical)
+    #   msg_box.setWindowTitle("Error")
+    #   msg_box.setText(str(e))
+    #   # msg_box.activateWindow() # make sure window is on top
+    #   msg_box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+    #   # msg_box.exec() # wait for user to click ok before continuing
+    #   msg_box.show() # continue straight away
+    #   return
     window.plotStock()
     tray_icon.windows.append(window)
     settings_stock_object = self.SettingsStockLayout(self, window)
@@ -238,7 +239,7 @@ class SettingsWindow(QMainWindow):
     if app_path: # check that app is running as exe
       try:
         key = reg.HKEY_CURRENT_USER
-        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
         reg.SetValueEx(open_key, app_name, 0, reg.REG_SZ, app_path)
         reg.CloseKey(open_key)
@@ -253,7 +254,7 @@ class SettingsWindow(QMainWindow):
     if self.exeFilePath():
       try:
         key = reg.HKEY_CURRENT_USER
-        key_path = "Software\Microsoft\Windows\CurrentVersion\Run"
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         open_key = reg.OpenKey(key, key_path, 0, reg.KEY_ALL_ACCESS)
 
         # Delete the registry value if it exists

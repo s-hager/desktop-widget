@@ -38,4 +38,5 @@ window_margins = [10, 10, 10, 10]
 log_to_file = False
 debug = False # set to False for pyinstaller
 # debug = True # set to False for pyinstaller
+debug_force_market_open = False # set to True to test open market state when closed
 ### ------------------------------------------------------------------------ ###

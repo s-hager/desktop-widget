@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QSizeGrip, QLabel, QWidget, 
-                             QVBoxLayout, QSizePolicy)
-from PyQt6.QtCore import Qt, QSize, QPoint, QTimer
-from PyQt6.QtGui import QGuiApplication, QFont
+                             QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy, QGraphicsOpacityEffect)
+from PyQt6.QtCore import Qt, QSize, QPoint, QTimer, pyqtSignal, QRectF, QThread, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QGuiApplication, QFont, QPainterPath, QRegion
 from BlurWindow.blurWindow import GlobalBlur
 # import matplotlib.pyplot as plt
 # import matplotlib.ticker as ticker
@@ -17,6 +17,8 @@ import logging
 import time
 import calendar
 import sys
+import ctypes
+import platform
 
 import dev_sandbox.MyQLabel as MyQLabel #TODO WIP
 
@@ -36,25 +38,77 @@ from constants import *
 #     if index >= len(self.dates) or index < 0:
 #       return ''
 #     return self.dates[index].strftime(self.format)
+class IndexTimeAxisItem(pg.AxisItem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.datetimes = None
+        
+    def set_datetimes(self, datetimes):
+        self.datetimes = datetimes
+        self.picture = None
+        self.update()
+        
+    def tickValues(self, minVal, maxVal, size):
+        num_labels = 5
+        spacing = max(1.0, round((maxVal - minVal) / max(1, (num_labels - 1))))
+        
+        start = int((minVal + spacing - 1) // spacing) * spacing
+        values = []
+        val = start
+        while val <= maxVal:
+            values.append(val)
+            val += spacing
+            
+        return [(spacing, values)]
+
+    def tickStrings(self, values, scale, spacing):
+        if self.datetimes is None or len(self.datetimes) == 0:
+            return [''] * len(values)
+        
+        strings = []
+        for v in values:
+            index = int(round(v))
+            if 0 <= index < len(self.datetimes):
+                dt = self.datetimes.iloc[index]
+                if hasattr(dt, 'strftime'):
+                    day = dt.day
+                    month = dt.strftime("%b")
+                    strings.append(f"{day}. {month}")
+                else:
+                    strings.append(str(dt))
+            else:
+                strings.append('')
+        return strings
+
+class MajorTickAxisItem(pg.AxisItem):
+    """Custom AxisItem that strips out minor ticks to prevent minor gridlines."""
+    def tickValues(self, minVal, maxVal, size):
+        ticks = super().tickValues(minVal, maxVal, size)
+        if ticks:
+            return [ticks[0]]
+        return ticks
 
 class CrosshairPlotWidget(pg.PlotWidget):
+  mouseMovedSignal = pyqtSignal(float)
+
   def __init__(self, crosshair, parent=None, background='default', plotItem=None, **kargs):
     super().__init__(parent=parent, background=background, plotItem=plotItem, **kargs)
     self.crosshair = crosshair
     self.vLine = None
     self.hLine = None
-    # self.vLine.show()
-    # self.hLine.show()
+    self.textItem = None
   
   def leaveEvent(self, event):
     if self.crosshair:
-      self.vLine.hide()
-      self.hLine.hide()
+      if self.vLine: self.vLine.hide()
+      if self.hLine: self.hLine.hide()
+      if self.textItem: self.textItem.hide()
 
   def enterEvent(self, event):
     if self.crosshair:
-      self.vLine.show()
-      self.hLine.show()
+      if self.vLine: self.vLine.show()
+      if self.hLine: self.hLine.show()
+      if self.textItem: self.textItem.show()
 
   def mouseMoveEvent(self, event):
     if self.crosshair:
@@ -62,11 +116,144 @@ class CrosshairPlotWidget(pg.PlotWidget):
       pos = event.position()
       if self.sceneBoundingRect().contains(pos):
         mousePoint = vb.mapSceneToView(pos)
-        self.vLine.setPos(mousePoint.x())
-        self.hLine.setPos(mousePoint.y())
+        self.mouseMovedSignal.emit(mousePoint.x())
 
   def toggleCrosshair(self):
     self.crosshair = not self.crosshair
+
+class DownloadWorker(QThread):
+  finished_download = pyqtSignal(dict)
+
+  def __init__(self, stock_symbol, parent=None):
+    super().__init__(parent)
+    self.stock_symbol = stock_symbol
+
+  def replaceCurrencySymbols(self, text):
+    currency_symbols = {
+        "USD": "$",
+        "EUR": "€",
+        "JPY": "¥",
+        "GBP": "£",
+    }
+    for currency_code, currency_symbol in currency_symbols.items():
+        text = text.replace(currency_code, currency_symbol)
+    return text
+
+  def run(self):
+    logging.info(f"Downloading Stock Data for {self.stock_symbol}...")
+    try_counter = 0
+    while try_counter < retries:
+      try:
+        data = yf.download(self.stock_symbol,
+                           interval="1h",
+                           period="1mo",
+                           prepost=True,
+                           progress=False,
+                           auto_adjust=True)
+        update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data = data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
+        data['Datetime'] = pd.to_datetime(data['Datetime'])
+        
+        ticker_info = yf.Ticker(self.stock_symbol).info
+        currency_symbol = self.replaceCurrencySymbols(ticker_info.get("currency", "$"))
+        
+        percentage_increase = 0.0
+        increase_symbol = ""
+        close_price = 0.0
+        current_price = ticker_info.get("regularMarketPrice", 0.0)
+        post_market_price = ticker_info.get("postMarketPrice", None)
+        post_market_percentage_increase = ticker_info.get("postMarketChangePercent", 0.0)
+        post_market_increase_symbol = '+' if post_market_percentage_increase is not None and post_market_percentage_increase >= 0 else ''
+        
+        market_state = ticker_info.get("marketState", "UNKNOWN")
+        next_target_timestamp = None
+        next_target_type = ""
+
+        try:
+            md = yf.Ticker(self.stock_symbol).get_history_metadata()
+            tp = md.get("tradingPeriods")
+            if tp is not None and not tp.empty:
+                last_tp = tp.iloc[-1]
+                start = last_tp['start']
+                end = last_tp['end']
+                now = pd.Timestamp.now(tz=start.tz)
+                
+                is_24_7 = (start.hour == 0 and start.minute == 0 and end.hour == 23 and end.minute == 59)
+                
+                if not is_24_7:
+                    if now < start:
+                        next_target_timestamp = start.timestamp()
+                        next_target_type = "open"
+                    elif start <= now < end:
+                        next_target_timestamp = end.timestamp()
+                        next_target_type = "close"
+                    else:
+                        next_start = start + timedelta(days=1)
+                        while next_start.weekday() >= 5:
+                            next_start += timedelta(days=1)
+                        next_target_timestamp = next_start.timestamp()
+                        next_target_type = "open"
+        except Exception as e:
+            logging.info(f"Could not parse market hours: {e}")
+
+        if current_price == 0.0 and not data.empty:
+            current_price = data['Close'].iloc[-1].iloc[0] if isinstance(data['Close'].iloc[-1], pd.Series) else data['Close'].iloc[-1]
+
+        close_price = ticker_info.get("regularMarketPreviousClose", 0.0)
+        percentage_increase = ticker_info.get("regularMarketChangePercent", 0.0)
+        logging.info(f"{self.stock_symbol} Close: {currency_symbol}{close_price}")
+        increase_symbol = '+' if percentage_increase >= 0 else ''
+        logging.info(f"{self.stock_symbol} Increase: {increase_symbol}{percentage_increase:.2f}%")
+        
+        if debug_force_market_open:
+            market_state = "REGULAR"
+            next_target_timestamp = time.time() + 3600 * 3
+            next_target_type = "close"
+        
+        result = {
+            'data': data,
+            'update_time': update_time,
+            'currency_symbol': currency_symbol,
+            'percentage_increase': percentage_increase,
+            'increase_symbol': increase_symbol,
+            'close_price': close_price,
+            'current_price': current_price,
+            'post_market_price': post_market_price,
+            'post_market_percentage_increase': post_market_percentage_increase,
+            'post_market_increase_symbol': post_market_increase_symbol,
+            'market_state': market_state,
+            'next_target_timestamp': next_target_timestamp,
+            'next_target_type': next_target_type,
+            'error': None
+        }
+        self.finished_download.emit(result)
+        return
+      except Exception as e:
+        logging.info(f"An exception occurred: {str(e)}")
+        logging.info(f"Download Attempt {try_counter + 1} failed.")
+        logging.info("Retrying in 0.5 seconds...")
+        time.sleep(0.5)
+      try_counter += 1
+      
+    error_msg = f"Could not download stock data for {self.stock_symbol} after {retries} tries."
+    logging.error(error_msg)
+    result = {
+        'data': pd.DataFrame(),
+        'update_time': "Error",
+        'currency_symbol': "",
+        'percentage_increase': 0.0,
+        'increase_symbol': "",
+        'close_price': 0.0,
+        'current_price': 0.0,
+        'post_market_price': None,
+        'post_market_percentage_increase': 0.0,
+        'post_market_increase_symbol': "",
+        'market_state': "UNKNOWN",
+        'next_target_timestamp': None,
+        'next_target_type': "",
+        'error': error_msg
+    }
+    self.finished_download.emit(result)
 
 class ChartWindow(QMainWindow):
   def __init__(self, tray_icon, stock_symbol, window_id):
@@ -104,10 +291,13 @@ class ChartWindow(QMainWindow):
     self.setCentralWidget(self.central_widget)
 
     self.blurBackground()
-    # self.roundCorners() # TODO
+    self.roundCorners()
 
     # Create plot
-    self.plotWidget = CrosshairPlotWidget(self.initial_crosshair)
+    time_axis = IndexTimeAxisItem(orientation='bottom')
+    left_axis = MajorTickAxisItem(orientation='left')
+    self.plotWidget = CrosshairPlotWidget(self.initial_crosshair, axisItems={'bottom': time_axis, 'left': left_axis})
+    self.plotWidget.mouseMovedSignal.connect(self.onCrosshairMoved)
     # self.graphWidget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     self.plotWidget.setBackground(pg.mkColor(chart_background_color))
     self.plotWidget.setMouseEnabled(x=False, y=False)
@@ -139,7 +329,7 @@ class ChartWindow(QMainWindow):
     # self.figure.patch.set_alpha(0)
     # # self.canvas.setStyleSheet("QWidget { border: 1px solid red; }") # canvas is a widget
     
-    self.downloadStockData()
+    self.startDownloadStockData()
 
     # Load settings from config file and move window
     self.settings_position = settings.value(f"{self.window_id}_pos", type=QPoint)
@@ -163,7 +353,7 @@ class ChartWindow(QMainWindow):
 
     # Add the title bar and canvas to a vertical layout
 
-    self.title_widget = self.titleWidget()
+    self.title_widget = self.createTitleWidget()
     self.title_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
     # self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     self.plotWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -198,22 +388,36 @@ class ChartWindow(QMainWindow):
   #   region_ = QRegion(rounded_rect_path.toFillPolygon().toPolygon())
   #   self.setMask(region_)
 
-  # def roundCorners(self):
-  #   # Create a QPainterPath with rounded corners
-  #   path = QPainterPath()
-  #   rectf = QRectF(self.rect())
-  #   path.addRoundedRect(rectf, 100, 100)
+  def roundCorners(self):
+    # Try Windows 11 native rounded corners first (smooth)
+    if sys.platform == 'win32':
+        try:
+            build = int(platform.version().split('.')[2])
+            if build >= 22000:
+                hwnd = int(self.winId())
+                value = ctypes.c_int(2) # DWMWCP_ROUND
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(value), ctypes.sizeof(value))
+                return
+        except Exception as e:
+            logging.warning(f"Could not set native rounded corners: {e}")
 
-  #   # Create a QRegion with the QPainterPath and set it as the widget's mask
-  #   region_ = QRegion(path.toFillPolygon().toPolygon())
-  #   self.setMask(region_)
+    # Fallback to QRegion mask (works on Win10 and earlier)
+    path = QPainterPath()
+    rectf = QRectF(self.rect())
+    path.addRoundedRect(rectf, 12.0, 12.0)
+
+    # Create a QRegion with the QPainterPath and set it as the widget's mask
+    region_ = QRegion(path.toFillPolygon().toPolygon())
+    self.setMask(region_)
 
   # lag workaround for blurred background (makes window stutter):
   # def moveEvent(self, event) -> None:
   #   time.sleep(0.01)  # sleep for 10ms
 
-  # def resizeEvent(self, event) -> None:
-  #   time.sleep(0.01)  # sleep for 10ms
+  def resizeEvent(self, event) -> None:
+    # Update the mask when the window is resized
+    self.roundCorners()
+    super().resizeEvent(event)
 
   def toggleCrosshair(self):
     self.plotWidget.toggleCrosshair()
@@ -262,90 +466,35 @@ class ChartWindow(QMainWindow):
     settings.setValue(f"{self.window_id}_pos", self.pos())
     settings.setValue(f"{self.window_id}_size", self.size())
 
-  def downloadStockData(self):
-    # Get stock data and convert index Datetime to its own column (['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-    logging.info(f"Downloading Stock Data for {self.stock_symbol}...")
-      # self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=True) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-    # else:
-    try_counter = 0
-    while try_counter < retries:
-      try:
-        self.data = yf.download(self.stock_symbol, interval="1h", period="1mo", prepost=True, progress=False) # Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-        self.update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.data = self.data.reset_index().rename({'index': 'Datetime'}, axis=1, copy=False)
-        self.data['Datetime'] = pd.to_datetime(self.data['Datetime'])
-        # Get stock currency
-        self.currency_symbol = self.replaceCurrencySymbols(yf.Ticker(self.stock_symbol).info["currency"])
-        # self.currency_symbol = yf.Ticker(self.stock_symbol).info["currency"]
-        if percentage_change:
-          last_close_date = self.data['Datetime'].iloc[-1].strftime("%Y-%m-%d")
-          previous_close_date = datetime.strptime(last_close_date, "%Y-%m-%d")
-          previous_close_date = (previous_close_date - timedelta(days=1)).strftime("%Y-%m-%d")
-          # print(last_close_date)
-          # print(previous_close_date)
-          last_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == last_close_date]
-          previous_close_data = self.data[self.data['Datetime'].dt.strftime("%Y-%m-%d") == previous_close_date]
-          # print(last_close_data)
-          # print(previous_close_data)
-          last_close_last_nonzero_index = last_close_data[last_close_data['Volume'] != 0].index[-1]
-          previous_close_last_nonzero_index = previous_close_data[previous_close_data['Volume'] != 0].index[-1]
-          try:
-            last_close_value = last_close_data.loc[last_close_last_nonzero_index + 1, 'Open']
-          except Exception as e:
-            last_close_value = last_close_data.loc[last_close_last_nonzero_index, 'Open']
-          try:
-            previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index + 1, 'Open']
-          except Exception as e:
-            previous_close_value = previous_close_data.loc[previous_close_last_nonzero_index, 'Open']
-          #last_close_data = last_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
-          #previous_close_data = previous_close_data[self.data['Volume'] != 0] # manually exclude pre and post market data (where volume == 0)
-          # print(last_close_data)
-          # last_close_value = round(last_close_open_value_after_last_nonzero, 2)
-          # last_close_value = last_close_open_value_after_last_nonzero
-          # previous_close_value = round(previous_close_open_value_after_last_nonzero, 2)
-          # previous_close_value = previous_close_open_value_after_last_nonzero
+  def startDownloadStockData(self):
+    self.download_worker = DownloadWorker(self.stock_symbol, self)
+    self.download_worker.finished_download.connect(self.onDownloadFinished)
+    self.download_worker.start()
 
-          logging.info(f"{self.stock_symbol} Open:  {self.currency_symbol}{last_close_value}")
-          logging.info(f"{self.stock_symbol} Close: {self.currency_symbol}{previous_close_value}")
-          # print(last_close_value)
-          # print(previous_close_value)
-          self.percentage_increase = ((last_close_value - previous_close_value) / previous_close_value) * 100
-          self.increase_symbol = '+' if self.percentage_increase >= 0 else ''
-          logging.info(f"{self.stock_symbol} Increase: {self.increase_symbol}{self.percentage_increase:.2f}%")
-
-          self.close_price = last_close_value
-          # print(f"{self.percentage_increase:.2f}%")
-          # print(self.percentage_increase)
-
-        self.current_price = self.data['Close'].iloc[-1]
-        # print(type(self.data['Datetime']))
-        # print(self.data['Datetime'])
-        break
-      except Exception as e:
-        logging.info(f"An exception occurred: {str(e)}")
-        logging.info(f"Download Attempt {try_counter + 1} failed.")
-        logging.info("Retrying in 0.5 seconds...")
-        time.sleep(0.5)
-      try_counter += 1
-    if try_counter == retries:
-      # self.setWindowIcon(QIcon(app_icon))
-      # QMessageBox.critical(self, "Error", "Could not download stock data after 5 tries.")
-      error = f"Could not download stock data for {self.stock_symbol} after {retries} tries."
-      raise RuntimeError(error)
-
-  def replaceCurrencySymbols(self, text):
-    currency_symbols = {
-        "USD": "$",
-        "EUR": "€",
-        "JPY": "¥",
-        "GBP": "£",
-    }
-    for currency_code, currency_symbol in currency_symbols.items():
-        text = text.replace(currency_code, currency_symbol)
-    return text
+  def onDownloadFinished(self, result):
+    self.data = result['data']
+    self.update_time = result['update_time']
+    self.currency_symbol = result['currency_symbol']
+    self.percentage_increase = result['percentage_increase']
+    self.increase_symbol = result['increase_symbol']
+    self.close_price = result['close_price']
+    self.current_price = result['current_price']
+    self.post_market_price = result.get('post_market_price')
+    self.post_market_percentage_increase = result.get('post_market_percentage_increase')
+    self.post_market_increase_symbol = result.get('post_market_increase_symbol')
+    self.market_state = result.get('market_state', 'UNKNOWN')
+    self.next_target_timestamp = result.get('next_target_timestamp')
+    self.next_target_type = result.get('next_target_type')
+    
+    self.updateTitleWidgetText()
+    if display_refresh_time and hasattr(self, 'refresh_time_label'):
+      self.updateRefreshTimeLabel()
+    self.plotStock()
+    logging.info("Done Refreshing Plot")
 
   def refreshTimeLabel(self):
-    self.refresh_time_label = QLabel(f"{self.update_time}") # self.update_time is set by downloadStockData()
+    # self.update_time is set by onDownloadFinished(), initially empty or 'Loading...'
+    self.refresh_time_label = QLabel(f"{getattr(self, 'update_time', 'Loading...')}")
     if debug:
       self.refresh_time_label.setStyleSheet(f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;")
     else:
@@ -360,52 +509,146 @@ class ChartWindow(QMainWindow):
     self.refresh_time_label.setText(self.update_time)
     logging.info(f"Updated Refresh Time to {self.update_time}")
 
-  def titleWidget(self):
-    if percentage_change and self.percentage_increase >= 0:
-      text_color = chart_line_color_positive
-    elif percentage_change:
-      text_color = chart_line_color_negative
-    if debug:
-      if percentage_change:
-        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                   <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
-                   <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}% {self.window_id}</font>
-                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
-      else:
-        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color}; border: 1px solid red;"
-    else:
-      if percentage_change:
-        #title = MyQLabel(f"{self.stock_symbol.upper()} {self.currency_symbol}{self.data['Close'].iloc[-1]:.2f}")
-        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                   <font size='1.5'>{self.currency_symbol}{self.close_price:.2f}</font>
-                   <font size='1.5' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}%</font>
-                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
-      else:
-        text = f"""<font size='3'>{self.stock_symbol.upper()}</font>
-                   <font size='1.5'>{self.currency_symbol}{self.current_price:.2f}</font>"""
-        stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
-    title = QLabel()
-    title.setStyleSheet(stylesheet)
-    title.setText(text)
+  def createTitleWidget(self):
+    self.title_container = QWidget()
+    
+    layout = QVBoxLayout(self.title_container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+    
+    top_row = QHBoxLayout()
+    top_row.setContentsMargins(0, 0, 0, 0)
+    top_row.setSpacing(6)
+
+    self.status_dot = QLabel()
+    self.status_dot.setFixedSize(18, 18)
+    self.status_dot.setStyleSheet("background-color: grey; border-radius: 9px;")
+    
+    self.main_price_label = QLabel()
     font = QFont()
     font.setPointSize(title_font_size)
-    title.setFont(font)
-    title.setContentsMargins(0, 0, 0, 0)
-    return title
+    self.main_price_label.setFont(font)
+    self.main_price_label.setContentsMargins(0, 0, 0, 0)
+    
+    self.dot_layout = QVBoxLayout()
+    self.dot_layout.setContentsMargins(0, 3, 0, 0) # Exact margin to push it down
+    self.dot_layout.addWidget(self.status_dot)
+    
+    top_row.addLayout(self.dot_layout)
+    top_row.addWidget(self.main_price_label, alignment=Qt.AlignmentFlag.AlignTop)
+    top_row.addStretch()
+    
+    bottom_row = QHBoxLayout()
+    bottom_row.setContentsMargins(0, 0, 0, 0)
+    bottom_row.setSpacing(6)
+    
+    self.countdown_label = QLabel()
+    font = QFont()
+    font.setPointSize(update_font_size)
+    self.countdown_label.setFont(font)
+    self.countdown_label.setStyleSheet(f"color: {legend_color};")
+    self.countdown_label.setText("--:--:--")
+    
+    self.ah_price_label = QLabel()
+    ah_font = QFont()
+    ah_font.setPointSize(update_font_size)
+    self.ah_price_label.setFont(ah_font)
+    self.ah_price_label.setContentsMargins(0, 0, 0, 0)
+    self.ah_price_label.hide()
+    
+    bottom_row.addWidget(self.countdown_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+    bottom_row.addWidget(self.ah_price_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+    bottom_row.addStretch()
+    
+    layout.addLayout(top_row)
+    layout.addLayout(bottom_row)
+    layout.addStretch()
+
+    stylesheet = f"background-color: rgba(0, 0, 0, 0); color:{legend_color};"
+    if debug:
+      stylesheet += " border: 1px solid red;"
+    self.title_container.setStyleSheet(stylesheet)
+
+    self.dot_opacity_effect = QGraphicsOpacityEffect(self.status_dot)
+    self.status_dot.setGraphicsEffect(self.dot_opacity_effect)
+    self.dot_animation = QPropertyAnimation(self.dot_opacity_effect, b"opacity")
+    self.dot_animation.setDuration(1500)
+    self.dot_animation.setStartValue(0.2)
+    self.dot_animation.setEndValue(1.0)
+    self.dot_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
+    self.dot_animation.setLoopCount(-1)
+
+    self.countdown_timer = QTimer(self)
+    self.countdown_timer.timeout.connect(self.updateCountdown)
+    self.countdown_timer.start(1000)
+    
+    return self.title_container
+
+  def updateCountdown(self):
+    if not hasattr(self, 'next_target_timestamp') or self.next_target_timestamp is None:
+        self.countdown_label.setText("")
+        return
+
+    now_ts = time.time()
+    diff = int(self.next_target_timestamp - now_ts)
+    if diff <= 0:
+        self.countdown_label.setText("00:00:00")
+        return
+
+    hours = diff // 3600
+    minutes = (diff % 3600) // 60
+    seconds = diff % 60
+    if hours > 0:
+        self.countdown_label.setText(f"{hours}h:{minutes:02d}m:{seconds:02d}s")
+    else:
+        self.countdown_label.setText(f"{minutes:02d}m:{seconds:02d}s")
+
+  def updateTitleWidgetText(self):
+    if hasattr(self, 'market_state'):
+        if self.market_state == "REGULAR":
+            self.status_dot.setStyleSheet("background-color: #21b700; border-radius: 9px;")
+            if self.dot_animation.state() != QPropertyAnimation.State.Running:
+                self.dot_animation.start()
+        else:
+            self.status_dot.setStyleSheet("background-color: grey; border-radius: 9px;")
+            self.dot_animation.stop()
+            self.dot_opacity_effect.setOpacity(1.0)
+
+    if not hasattr(self, 'data') or self.data is None or (isinstance(self.data, pd.DataFrame) and self.data.empty):
+      self.main_price_label.setText(f"<font size='4'>{self.stock_symbol.upper()}</font> <font size='2' color='red'>Error: Could not load data</font>")
+      self.ah_price_label.hide()
+    else:
+      if self.percentage_increase >= 0:
+        text_color = chart_line_color_positive
+      else:
+        text_color = chart_line_color_negative
+        
+      main_text = f"""<font size='3'>{self.stock_symbol.upper()}</font>&nbsp;&nbsp;
+                 <font size='2'>{self.currency_symbol}{self.current_price:.2f}</font>&nbsp;
+                 <font size='2' color='{text_color}'>{self.increase_symbol}{self.percentage_increase:.2f}%{' ' + self.window_id if debug else ''}</font>"""
+      self.main_price_label.setText(main_text)
+                   
+      is_regular = hasattr(self, 'market_state') and self.market_state == "REGULAR"
+      if not is_regular and hasattr(self, 'post_market_price') and self.post_market_price is not None:
+        if self.post_market_percentage_increase is not None and self.post_market_percentage_increase >= 0:
+            pm_color = chart_line_color_positive
+        else:
+            pm_color = chart_line_color_negative
+            
+        pm_pct = self.post_market_percentage_increase if self.post_market_percentage_increase is not None else 0.0
+        ah_text = f"""<font color='white'>AH: {self.currency_symbol}{self.post_market_price:.2f}</font>&nbsp;
+                      <font color='{pm_color}'>{self.post_market_increase_symbol}{pm_pct:.2f}%</font>"""
+        self.ah_price_label.setText(ah_text)
+        self.ah_price_label.show()
+      else:
+        self.ah_price_label.hide()
 
   def startRefreshTimer(self):
     # Create a QTimer object
     self.refresh_timer = QTimer(self)
     # Connect the timer's timeout signal to the plot_stock method
     self.refresh_timer.timeout.connect(lambda: logging.info("Refreshing Plot..."))
-    self.refresh_timer.timeout.connect(self.downloadStockData)
-    self.refresh_timer.timeout.connect(self.plotStock)
-    self.refresh_timer.timeout.connect(self.updateRefreshTimeLabel)
-    self.refresh_timer.timeout.connect(lambda: logging.info("Done Refreshing Plot"))
+    self.refresh_timer.timeout.connect(self.startDownloadStockData)
     # Start the timer with the specified refresh_interval in milliseconds
     self.refresh_timer.start(refresh_interval * 1000)
 
@@ -486,6 +729,33 @@ class ChartWindow(QMainWindow):
   def format_y_tick_label(self, value, pos):
     return f"{self.currency_symbol}{value:.2f}"
 
+  def onCrosshairMoved(self, x):
+    if not hasattr(self, 'data') or self.data is None or len(self.data) == 0:
+      return
+    
+    index = int(round(x))
+    if index < 0: index = 0
+    elif index >= len(self.data['Close']): index = len(self.data['Close']) - 1
+    
+    y_val = float(self.data['Close'].iloc[index].item()) if hasattr(self.data['Close'].iloc[index], 'item') else float(self.data['Close'].iloc[index])
+    
+    if hasattr(self.plotWidget, 'vLine') and self.plotWidget.vLine is not None:
+      self.plotWidget.vLine.setPos(index)
+      self.plotWidget.hLine.setPos(y_val)
+      
+      time_val = self.data['Datetime'].iloc[index]
+      if hasattr(time_val, 'strftime'):
+          time_str = time_val.strftime("%Y-%m-%d %H:%M")
+      else:
+          time_str = str(time_val)
+          
+      self.plotWidget.textItem.setText(f"{time_str}\n${y_val:.2f}")
+      if index > len(self.data['Close']) / 2:
+          self.plotWidget.textItem.setAnchor((1.1, 0.5))
+      else:
+          self.plotWidget.textItem.setAnchor((-0.1, 0.5))
+      self.plotWidget.textItem.setPos(index, y_val)
+
   def plotStock(self):
     # Function to convert datetime string to "July 26" format
     # def format_x_label(datetime_str):
@@ -500,16 +770,26 @@ class ChartWindow(QMainWindow):
     # Clear the existing plot
     self.plotItem.clear()
 
+    if not hasattr(self, 'data') or self.data is None or (isinstance(self.data, pd.DataFrame) and self.data.empty):
+      logging.info("No data to plot.")
+      return
+
     # add crosshair
     self.plotWidget.vLine = pg.InfiniteLine(angle=90, movable=False)
     self.plotWidget.hLine = pg.InfiniteLine(angle=0, movable=False)
+    self.plotWidget.textItem = pg.TextItem(text="", color=(255, 255, 255), fill=(0, 0, 0, 150))
     self.plotWidget.addItem(self.plotWidget.vLine, ignoreBounds=True)
     self.plotWidget.addItem(self.plotWidget.hLine, ignoreBounds=True)
+    self.plotWidget.addItem(self.plotWidget.textItem, ignoreBounds=True)
+    self.plotWidget.vLine.hide()
+    self.plotWidget.hLine.hide()
+    self.plotWidget.textItem.hide()
 
     # print(np.arange(len(self.data['Datetime'])))
     # Plot the stock data
     x = np.arange(len(self.data['Datetime']))
-    y = self.data['Close']
+    y = self.data['Close'].to_numpy().flatten()
+
     # print(self.data['Datetime'])
     # x = self.data['Datetime']
     # pd.set_option('display.max_rows', None)
@@ -521,79 +801,14 @@ class ChartWindow(QMainWindow):
     # print(self.data['Datetime'][0])
     # print(type(self.data['Datetime'][0]))
     
-    def find_open_dates():
-      # # https://www.swingtradesystems.com/trading-days-calendars.html
-      open_dates = []
-      for index, timestamp in enumerate(self.data['Datetime']):
-        # if date n + 1 - 1 day is not equal to date n
-        # if self.data['Datetime'][index + 1] is not None and timestamp.day != self.data['Datetime'][index + 1].day - 1: #and timestamp.month == self.data['Datetime'][index + 1].month:
-        try:
-          if timestamp.day != self.data['Datetime'][index + 1].day: #and timestamp.month == self.data['Datetime'][index + 1].month:
-            # print("x")
-            # print(timestamp.day)
-            # print(self.data['Datetime'][index + 1].day)
-          # if timestamp.day != self.data['Datetime'][index + 1].day: #and timestamp.month == self.data['Datetime'][index + 1].month:
-            # stock market closed detected
-            # print(timestamp.day, self.data['Datetime'][index + 1].day - 1)
-            # print(timestamp.day, self.data['Datetime'][index + 1].day)
-            # print(self.data['Datetime'][index])
-            open_dates.append((timestamp.day, timestamp.month, timestamp.year, index))
-        except KeyError:
-          open_dates.append((timestamp.day, timestamp.month, timestamp.year, index))
-          # print(timestamp.day)
-          # print(self.data['Datetime'][index])
-          break
-      # print(dates)
-      open_dates_series = pd.Series(open_dates)
-      open_dates = open_dates_series.unique()
-      # print(open_dates)
-      return open_dates
-
-    def find_first_day_after_gap(dates_list):
-      result_days = []
-      indices = []
-      length = len(dates_list)
-      for index, date in enumerate(dates_list):
-        _, days_in_month = calendar.monthrange(date[2], date[1])
-        if index + 1 <= length - 1:  # if index + 1 is still valid list index
-          if date[0] == days_in_month and dates_list[index + 1][0] == 1:
-            continue
-          elif date[0] != dates_list[index + 1][0] - 1:  # if date day n does not equal date day n+1 - 1
-            first_day_after_gap_date = dates_list[index + 1][0:3]
-            first_day_after_gap_index = dates_list[index + 1][3]
-            result_days.append(first_day_after_gap_date)
-            indices.append(first_day_after_gap_index)
-      # print(days)
-      return result_days, indices
-
-    # Create custom ticks and labels for x axis
-    open_dates = find_open_dates()
-    days, indices = find_first_day_after_gap(open_dates)
-    # print(days, indices)
-    # custom_x_labels = days
-    # custom_x_labels = [f'{t[0]}.{t[1]}.{t[2]}' for t in days]
-    
-    # if display_first_date_as_tick:
-    #   oldest_data = self.data['Datetime'][0]
-    #   oldest_day = (oldest_data.day, oldest_data.month, oldest_data.year)
-    #   days.insert(0, oldest_day)
-    #   indices.insert(0, 0)
-    #   print(days) # oldest day not showing????
-    #   print(indices) # oldest day not showing????
-
-    x_labels = [f'{date[0]}.{date[1]}.' for date in days]
-    x_ticks = indices
-
-    self.plotWidget.getAxis('bottom').setTicks([[(val, label) for val, label in zip(x_ticks, x_labels)]])
-
-    # Create a DateAxisItem for the x-axis
-    # axis = pg.DateAxisItem()
-    # self.plotItem.setAxisItems({'bottom':axis})
+    bottom_axis = self.plotWidget.getAxis('bottom')
+    if isinstance(bottom_axis, IndexTimeAxisItem):
+        bottom_axis.set_datetimes(self.data['Datetime'])
 
     # Customize plot appearance
     self.plotWidget.showGrid(x=True, y=True)
-    self.plotWidget.getAxis('left').setGrid(False)
-    self.plotWidget.getAxis('bottom').setGrid(False)
+    self.plotWidget.getAxis('right').setGrid(False)
+    self.plotWidget.getAxis('top').setGrid(False)
 
     self.plotWidget.getAxis('left').setTextPen(legend_color)
     self.plotWidget.getAxis('bottom').setTextPen(legend_color)
@@ -610,7 +825,7 @@ class ChartWindow(QMainWindow):
 
     # check if oldest close value is smaller or bigger than newest close value
     positive_chart = None
-    if self.data['Close'].iloc[-1] < self.data['Close'].iloc[0]: # compare last and first values and color chart accordingly 
+    if self.data['Close'].iloc[-1].item() < self.data['Close'].iloc[0].item(): # compare last and first values and color chart accordingly 
       positive_chart = True
     else:
       positive_chart = False
@@ -627,7 +842,7 @@ class ChartWindow(QMainWindow):
     if area_chart:
       # TODO: the y "limits" are not being set correctly
       self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1), fillLevel=0, brush=chart_area_color)
-      self.plotWidget.setYRange(min(self.data['Close']), max(self.data['Close']))
+      self.plotWidget.setYRange(float(np.nanmin(self.data['Close'].values)), float(np.nanmax(self.data['Close'].values)))
       # self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
     else:
       self.plotItem.plot(x=x, y=y, pen=pg.mkPen(color=chart_line_color, width=1))
@@ -635,7 +850,10 @@ class ChartWindow(QMainWindow):
     # https://stackoverflow.com/questions/69816567/pyqtgraph-cuts-off-tick-labels-if-showgrid-is-called
     for key in ['right', 'top']:
       self.plotWidget.showAxis(key)                            # Show top/right axis (and grid, since enabled here)
-      self.plotWidget.getAxis(key).setStyle(showValues=False)  # Hide tick labels on top/right
+      axis = self.plotWidget.getAxis(key)
+      axis.setStyle(showValues=False, tickLength=0)  # Hide tick labels and lines on top/right
+      if key == 'right':
+        axis.setWidth(2)  # Give the right axis a small width so its line doesn't get clipped
 
     # self.plotWidget.hLine = pg.InfiniteLine(angle=0, movable=False)
     # self.plotWidget.addItem(self.plotWidget.vLine, ignoreBounds=True)
