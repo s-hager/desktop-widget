@@ -41,8 +41,10 @@ jobs:
         
     - name: Create GitHub Release
       id: create_release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
+        tag_name: latest
+        name: Latest Build
         files: dist/StockWidget.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
