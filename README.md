@@ -33,6 +33,24 @@ desktop-widget is a stock chart widget app for the desktop.
 
 ![classes](classes.png)
 
+## Rust Rewrite
+
+Interested in rewriting this application in Rust? See the comprehensive guide:
+
+📚 **[Rust Rewrite Recommendations](RUST_REWRITE_RECOMMENDATIONS.md)**
+
+This guide includes:
+- Recommended Rust libraries for PyQt6, PyQtGraph, and yfinance replacements
+- Multiple technology stack options (iced, egui, Tauri)
+- Example code and configurations in [`examples/rust-rewrite/`](examples/rust-rewrite/)
+- Migration strategies and performance expectations
+
+**Quick Summary:**
+- **GUI**: `iced` or `egui` for native UI, `Tauri` for web-based
+- **Plotting**: `plotters` or `egui_plot`
+- **Financial Data**: `yahoo-finance-api`
+- **Data Processing**: `polars` + `ndarray`
+
 ## Building
 
 ### Windows build .exe
