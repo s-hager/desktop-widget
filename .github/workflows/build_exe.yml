@@ -23,7 +23,9 @@ jobs:
         python-version: '3.12'
 
     - name: Install Python dependencies
-      run: pip install -r requirements.txt
+      run: |
+        pip install -r requirements.txt
+        pip install Pillow
 
     - name: Build the application
       run: pyinstaller StockWidget.spec
